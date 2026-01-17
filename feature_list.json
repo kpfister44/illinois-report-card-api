@@ -1,0 +1,924 @@
+[
+  {
+    "category": "functional",
+    "description": "Health endpoint returns OK status without authentication",
+    "steps": [
+      "Step 1: Send GET request to /health without any headers",
+      "Step 2: Verify response status code is 200",
+      "Step 3: Verify response body contains {\"status\": \"ok\"}"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Unauthenticated requests to protected endpoints return 401",
+    "steps": [
+      "Step 1: Send GET request to /years without Authorization header",
+      "Step 2: Verify response status code is 401",
+      "Step 3: Verify error response contains code INVALID_API_KEY",
+      "Step 4: Send GET request to /schools/2025 without Authorization header",
+      "Step 5: Verify response status code is 401",
+      "Step 6: Send GET request to /search?q=chicago without Authorization header",
+      "Step 7: Verify response status code is 401"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Valid API key authentication allows access to protected endpoints",
+    "steps": [
+      "Step 1: Create a valid API key in the database",
+      "Step 2: Send GET request to /years with Authorization: Bearer <api_key>",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify last_used_at is updated for the API key",
+      "Step 5: Verify usage_logs table has a new entry for this request"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Invalid API key returns 401 Unauthorized",
+    "steps": [
+      "Step 1: Send GET request to /years with Authorization: Bearer invalid_key_12345",
+      "Step 2: Verify response status code is 401",
+      "Step 3: Verify error response has code INVALID_API_KEY",
+      "Step 4: Verify error message indicates key is missing or invalid"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Revoked API key returns 401 Unauthorized",
+    "steps": [
+      "Step 1: Create an API key and set is_active to false",
+      "Step 2: Send GET request to /years with the revoked key",
+      "Step 3: Verify response status code is 401",
+      "Step 4: Verify error response indicates invalid API key"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Rate limiting enforces tier limits and returns 429 when exceeded",
+    "steps": [
+      "Step 1: Create a free tier API key (100 requests/minute limit)",
+      "Step 2: Send 100 requests to /health endpoint in rapid succession",
+      "Step 3: Verify all 100 requests return 200 status",
+      "Step 4: Send 101st request within the same minute window",
+      "Step 5: Verify response status code is 429",
+      "Step 6: Verify error response has code RATE_LIMITED",
+      "Step 7: Verify error response contains retry_after field",
+      "Step 8: Wait for the rate limit window to expire",
+      "Step 9: Send another request and verify it succeeds with 200",
+      "Step 10: Verify usage_logs contains all request attempts"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /years returns list of all available data years",
+    "steps": [
+      "Step 1: Import data for years 2024 and 2025 into the database",
+      "Step 2: Send authenticated GET request to /years",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify response body has data array containing [2024, 2025]",
+      "Step 5: Verify response body has meta.count equal to 2"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schema/{year} returns field metadata for specified year",
+    "steps": [
+      "Step 1: Import 2025 data with schema_metadata populated",
+      "Step 2: Send authenticated GET request to /schema/2025",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify response contains array of column metadata objects",
+      "Step 5: Verify each metadata object has column_name, data_type, category, description",
+      "Step 6: Verify source_column_name is included for reference",
+      "Step 7: Verify is_suppressed_indicator field is present for columns that use *"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schema/{year}/{category} filters fields by category",
+    "steps": [
+      "Step 1: Ensure schema_metadata has columns in multiple categories (demographics, assessment, enrollment)",
+      "Step 2: Send authenticated GET request to /schema/2025/demographics",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify all returned fields have category equal to demographics",
+      "Step 5: Verify no fields from other categories are included",
+      "Step 6: Send GET request to /schema/2025/invalid_category",
+      "Step 7: Verify response returns empty array or appropriate error"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year} returns list of schools with pagination",
+    "steps": [
+      "Step 1: Import test data with at least 20 schools for year 2025",
+      "Step 2: Send authenticated GET request to /schools/2025",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify response has data array with school objects",
+      "Step 5: Verify response has meta with total, limit, and offset",
+      "Step 6: Verify default limit is 100",
+      "Step 7: Send GET request with ?limit=5&offset=0",
+      "Step 8: Verify exactly 5 schools returned",
+      "Step 9: Send GET request with ?limit=5&offset=5",
+      "Step 10: Verify next 5 schools returned (no overlap with previous)",
+      "Step 11: Verify meta.total reflects actual total count"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year} supports field selection via fields parameter",
+    "steps": [
+      "Step 1: Send authenticated GET request to /schools/2025?fields=rcdts,name,city",
+      "Step 2: Verify response status code is 200",
+      "Step 3: Verify each school object only contains rcdts, name, and city fields",
+      "Step 4: Verify no other fields are present in the response",
+      "Step 5: Verify meta.fields_returned reflects the count of selected fields"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year} filters by city",
+    "steps": [
+      "Step 1: Import schools in multiple cities (Chicago, Springfield, Peoria)",
+      "Step 2: Send authenticated GET request to /schools/2025?city=Chicago",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify all returned schools have city equal to Chicago",
+      "Step 5: Verify schools from other cities are not included"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year} filters by county",
+    "steps": [
+      "Step 1: Import schools in multiple counties",
+      "Step 2: Send authenticated GET request to /schools/2025?county=Cook",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify all returned schools have county equal to Cook",
+      "Step 5: Verify schools from other counties are not included"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year} filters by school type",
+    "steps": [
+      "Step 1: Import schools of different types (elementary, middle, high)",
+      "Step 2: Send authenticated GET request to /schools/2025?type=high",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify all returned schools are high schools",
+      "Step 5: Verify elementary and middle schools are not included"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year} supports sorting with sort and order parameters",
+    "steps": [
+      "Step 1: Import schools with varying enrollment numbers",
+      "Step 2: Send authenticated GET request to /schools/2025?sort=enrollment&order=desc",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify schools are ordered by enrollment descending",
+      "Step 5: Send GET request with ?sort=name&order=asc",
+      "Step 6: Verify schools are ordered alphabetically by name ascending",
+      "Step 7: Send GET request with ?sort=invalid_field",
+      "Step 8: Verify appropriate error response for invalid sort field"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year} enforces maximum limit of 1000",
+    "steps": [
+      "Step 1: Send authenticated GET request to /schools/2025?limit=2000",
+      "Step 2: Verify response either caps at 1000 or returns validation error",
+      "Step 3: Verify no more than 1000 records are returned"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year}/{rcdts} returns single school with all fields",
+    "steps": [
+      "Step 1: Import a school with rcdts 05-016-2140-17-0002",
+      "Step 2: Send authenticated GET request to /schools/2025/05-016-2140-17-0002",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify response has data object (not array)",
+      "Step 5: Verify data contains all 681+ columns from the year's schema",
+      "Step 6: Verify meta.year equals 2025",
+      "Step 7: Verify meta.fields_returned reflects total fields"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year}/{rcdts} supports field selection",
+    "steps": [
+      "Step 1: Send authenticated GET request to /schools/2025/05-016-2140-17-0002?fields=name,enrollment,act_composite",
+      "Step 2: Verify response status code is 200",
+      "Step 3: Verify only requested fields are present in response",
+      "Step 4: Verify rcdts is always included (identifier field)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year}/{rcdts} returns 404 for non-existent school",
+    "steps": [
+      "Step 1: Send authenticated GET request to /schools/2025/99-999-9999-99-9999",
+      "Step 2: Verify response status code is 404",
+      "Step 3: Verify error response has code NOT_FOUND",
+      "Step 4: Verify error message includes the requested rcdts"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year} returns 400 for invalid year",
+    "steps": [
+      "Step 1: Send authenticated GET request to /schools/2030",
+      "Step 2: Verify response status code is 400",
+      "Step 3: Verify error response has code INVALID_PARAMETER",
+      "Step 4: Verify error message indicates available years"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /districts/{year} returns list of districts with filtering and pagination",
+    "steps": [
+      "Step 1: Import test data with multiple districts for year 2025",
+      "Step 2: Send authenticated GET request to /districts/2025",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify response has data array with district objects",
+      "Step 5: Verify response has meta with total, limit, offset",
+      "Step 6: Send GET request with ?city=Chicago",
+      "Step 7: Verify only Chicago districts are returned",
+      "Step 8: Send GET request with ?limit=5&offset=0",
+      "Step 9: Verify pagination works correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /districts/{year}/{district_id} returns single district detail",
+    "steps": [
+      "Step 1: Import a district with known district_id",
+      "Step 2: Send authenticated GET request to /districts/2025/{district_id}",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify response has data object with district details",
+      "Step 5: Verify all district-level fields are included"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /districts/{year}/{district_id} returns 404 for non-existent district",
+    "steps": [
+      "Step 1: Send authenticated GET request to /districts/2025/nonexistent-id",
+      "Step 2: Verify response status code is 404",
+      "Step 3: Verify error response has code NOT_FOUND"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /state/{year} returns state-level aggregate data",
+    "steps": [
+      "Step 1: Import state-level data for year 2025",
+      "Step 2: Send authenticated GET request to /state/2025",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify response has data object with state aggregates",
+      "Step 5: Verify state-level metrics are present (total enrollment, averages, etc.)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /state/{year} supports field selection",
+    "steps": [
+      "Step 1: Send authenticated GET request to /state/2025?fields=total_enrollment,avg_act_composite",
+      "Step 2: Verify response status code is 200",
+      "Step 3: Verify only requested fields are present"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /search returns full-text search results across entities",
+    "steps": [
+      "Step 1: Import schools with names Lincoln Elementary, Lincoln High, and Washington Elementary",
+      "Step 2: Send authenticated GET request to /search?q=Lincoln",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify results include both Lincoln schools",
+      "Step 5: Verify Washington school is not in results",
+      "Step 6: Verify each result has rcdts, name, city, entity_type",
+      "Step 7: Verify meta.total reflects actual match count"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /search filters by entity type",
+    "steps": [
+      "Step 1: Import schools and districts with similar names",
+      "Step 2: Send authenticated GET request to /search?q=Springfield&type=school",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify only schools are returned (no districts)",
+      "Step 5: Send GET request with ?type=district",
+      "Step 6: Verify only districts are returned"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /search filters by year",
+    "steps": [
+      "Step 1: Import data for years 2024 and 2025 with different entities",
+      "Step 2: Send authenticated GET request to /search?q=test&year=2025",
+      "Step 3: Verify only 2025 entities are returned",
+      "Step 4: Send GET request with ?year=2024",
+      "Step 5: Verify only 2024 entities are returned"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /search respects limit parameter with max 50",
+    "steps": [
+      "Step 1: Import 100+ schools with Chicago in name or city",
+      "Step 2: Send authenticated GET request to /search?q=Chicago",
+      "Step 3: Verify default limit of 10 is applied",
+      "Step 4: Send GET request with ?limit=30",
+      "Step 5: Verify exactly 30 results returned",
+      "Step 6: Send GET request with ?limit=100",
+      "Step 7: Verify results capped at 50 (max limit)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /search handles special characters and query sanitization",
+    "steps": [
+      "Step 1: Send authenticated GET request to /search?q=O'Brien",
+      "Step 2: Verify response does not error (proper escaping)",
+      "Step 3: Send GET request with ?q=test--injection",
+      "Step 4: Verify no SQL injection occurs",
+      "Step 5: Send GET request with ?q=test*",
+      "Step 6: Verify wildcard handled appropriately for FTS5"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /search requires minimum query length",
+    "steps": [
+      "Step 1: Send authenticated GET request to /search?q=",
+      "Step 2: Verify response is 400 (query required)",
+      "Step 3: Send GET request with ?q=a",
+      "Step 4: Verify single character search works (min 1 char per spec)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /search returns results ranked by relevance",
+    "steps": [
+      "Step 1: Import school named 'Lincoln Elementary School' and 'Abraham Lincoln High'",
+      "Step 2: Send authenticated GET request to /search?q=Lincoln",
+      "Step 3: Verify both results returned",
+      "Step 4: Verify results are ordered by relevance (exact match higher)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /query executes flexible queries with field selection",
+    "steps": [
+      "Step 1: Import test schools for year 2025",
+      "Step 2: Send authenticated POST request to /query with body: {\"year\": 2025, \"entity_type\": \"school\", \"fields\": [\"rcdts\", \"name\", \"enrollment\"]}",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify each result contains only requested fields",
+      "Step 5: Verify meta includes total, limit, offset"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /query supports equality filters",
+    "steps": [
+      "Step 1: Import schools in multiple cities",
+      "Step 2: Send authenticated POST to /query with filters: {\"city\": \"Chicago\"}",
+      "Step 3: Verify all returned schools are in Chicago",
+      "Step 4: Verify total matches expected Chicago schools count"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /query supports comparison operators (gte, lte, gt, lt)",
+    "steps": [
+      "Step 1: Import schools with varying enrollment (100, 500, 1000, 2000)",
+      "Step 2: Send POST to /query with filters: {\"enrollment\": {\"gte\": 500}}",
+      "Step 3: Verify only schools with enrollment >= 500 returned",
+      "Step 4: Send POST with filters: {\"enrollment\": {\"lt\": 1000}}",
+      "Step 5: Verify only schools with enrollment < 1000 returned",
+      "Step 6: Send POST with filters: {\"enrollment\": {\"gte\": 500, \"lte\": 1500}}",
+      "Step 7: Verify range filter works correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /query supports IN operator for multiple values",
+    "steps": [
+      "Step 1: Import schools in Chicago, Springfield, and Peoria",
+      "Step 2: Send POST to /query with filters: {\"city\": {\"in\": [\"Chicago\", \"Springfield\"]}}",
+      "Step 3: Verify only schools in Chicago or Springfield returned",
+      "Step 4: Verify Peoria schools are excluded"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /query supports sorting",
+    "steps": [
+      "Step 1: Import schools with varying enrollment",
+      "Step 2: Send POST to /query with sort: {\"field\": \"enrollment\", \"order\": \"desc\"}",
+      "Step 3: Verify schools ordered by enrollment descending",
+      "Step 4: Send POST with sort: {\"field\": \"name\", \"order\": \"asc\"}",
+      "Step 5: Verify schools ordered alphabetically ascending"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /query supports pagination with limit and offset",
+    "steps": [
+      "Step 1: Import 50 test schools",
+      "Step 2: Send POST to /query with limit: 10, offset: 0",
+      "Step 3: Verify 10 results returned",
+      "Step 4: Send POST with limit: 10, offset: 10",
+      "Step 5: Verify next 10 results returned (no overlap)",
+      "Step 6: Verify meta.total reflects actual total count"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /query validates request body and returns appropriate errors",
+    "steps": [
+      "Step 1: Send POST to /query with missing year field",
+      "Step 2: Verify response is 400 with validation error",
+      "Step 3: Send POST with invalid entity_type",
+      "Step 4: Verify response is 400 with validation error",
+      "Step 5: Send POST with non-existent field in fields array",
+      "Step 6: Verify appropriate error message about invalid field",
+      "Step 7: Send POST with non-existent year",
+      "Step 8: Verify 400 error indicating invalid year"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /query prevents SQL injection through filter values",
+    "steps": [
+      "Step 1: Send POST to /query with filters: {\"city\": \"Chicago'; DROP TABLE schools_2025; --\"}",
+      "Step 2: Verify no SQL injection occurs",
+      "Step 3: Verify query returns no results or empty array",
+      "Step 4: Verify schools_2025 table still exists and has data"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Admin endpoint POST /admin/import uploads and processes Excel file",
+    "steps": [
+      "Step 1: Create test Excel file with sample school data",
+      "Step 2: Send authenticated POST to /admin/import with admin API key",
+      "Step 3: Include multipart/form-data with file and year=2025",
+      "Step 4: Verify response status code is 201",
+      "Step 5: Verify response has import_id and status: processing",
+      "Step 6: Poll /admin/import/status/{import_id} until complete",
+      "Step 7: Verify final status shows records_imported count",
+      "Step 8: Verify schools_2025 table contains imported data",
+      "Step 9: Verify schema_metadata populated with column info",
+      "Step 10: Verify entities_master updated with new entities"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Admin endpoint /admin/import requires admin API key",
+    "steps": [
+      "Step 1: Send POST to /admin/import with non-admin API key",
+      "Step 2: Verify response status code is 403",
+      "Step 3: Verify error code is FORBIDDEN",
+      "Step 4: Verify error message indicates admin access required"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Admin endpoint GET /admin/import/status/{id} returns import progress",
+    "steps": [
+      "Step 1: Start an import via POST /admin/import",
+      "Step 2: Immediately GET /admin/import/status/{import_id}",
+      "Step 3: Verify status shows processing or completed",
+      "Step 4: Wait for completion",
+      "Step 5: Verify final status shows completed with record count"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Admin endpoint POST /admin/keys creates new API key",
+    "steps": [
+      "Step 1: Send authenticated POST to /admin/keys with admin key",
+      "Step 2: Include body: {\"owner_email\": \"test@example.com\", \"owner_name\": \"Test User\", \"rate_limit_tier\": \"free\"}",
+      "Step 3: Verify response status code is 201",
+      "Step 4: Verify response contains full key (only returned once)",
+      "Step 5: Verify key starts with rc_live_ prefix",
+      "Step 6: Verify response contains key_prefix",
+      "Step 7: Verify new key works for API authentication",
+      "Step 8: Verify key stored as hash in database (not plaintext)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Admin endpoint GET /admin/keys lists all API keys",
+    "steps": [
+      "Step 1: Create multiple API keys",
+      "Step 2: Send authenticated GET to /admin/keys with admin key",
+      "Step 3: Verify response contains list of all keys",
+      "Step 4: Verify each key shows key_prefix, owner_email, owner_name",
+      "Step 5: Verify full key is NOT exposed (security)",
+      "Step 6: Verify is_active and rate_limit_tier fields present"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Admin endpoint DELETE /admin/keys/{id} revokes API key",
+    "steps": [
+      "Step 1: Create a test API key",
+      "Step 2: Verify the key works for authentication",
+      "Step 3: Send DELETE to /admin/keys/{key_id} with admin key",
+      "Step 4: Verify response status code is 200",
+      "Step 5: Verify key no longer works for authentication (401)",
+      "Step 6: Verify key still exists in database with is_active=false"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Admin endpoint GET /admin/usage returns usage statistics",
+    "steps": [
+      "Step 1: Make several API requests with different keys",
+      "Step 2: Send authenticated GET to /admin/usage with admin key",
+      "Step 3: Verify response contains usage statistics",
+      "Step 4: Filter with ?start_date and ?end_date",
+      "Step 5: Verify date filtering works correctly",
+      "Step 6: Filter with ?api_key_id",
+      "Step 7: Verify only that key's usage shown"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "CLI import command processes Excel file correctly",
+    "steps": [
+      "Step 1: Create test Excel file with school data including multiple sheets",
+      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2025",
+      "Step 3: Verify command completes successfully",
+      "Step 4: Verify schools_2025 table created and populated",
+      "Step 5: Verify schema_metadata contains column info",
+      "Step 6: Verify entities_master updated"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "CLI import --dry-run previews without modifying database",
+    "steps": [
+      "Step 1: Record current database state",
+      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2025 --dry-run",
+      "Step 3: Verify output shows what would be imported",
+      "Step 4: Verify no actual database changes made",
+      "Step 5: Verify schools_2025 table not created or unchanged"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "CLI import --list-years shows available years",
+    "steps": [
+      "Step 1: Import data for 2024 and 2025",
+      "Step 2: Run python -m app.cli.import_data --list-years",
+      "Step 3: Verify output shows 2024 and 2025"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Data import converts percentage strings to floats",
+    "steps": [
+      "Step 1: Create Excel file with percentage values like 75.5%",
+      "Step 2: Import the file",
+      "Step 3: Query the imported data",
+      "Step 4: Verify percentage stored as float 75.5 (not string)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Data import handles suppressed asterisk values as NULL",
+    "steps": [
+      "Step 1: Create Excel file with * values (privacy-suppressed)",
+      "Step 2: Import the file",
+      "Step 3: Query the imported data",
+      "Step 4: Verify * values are stored as NULL",
+      "Step 5: Verify is_suppressed_indicator marked in schema_metadata"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Data import handles enrollment strings with commas",
+    "steps": [
+      "Step 1: Create Excel file with enrollment values like 1,250",
+      "Step 2: Import the file",
+      "Step 3: Query the imported data",
+      "Step 4: Verify enrollment stored as integer 1250"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Data import normalizes column names correctly",
+    "steps": [
+      "Step 1: Create Excel file with columns like 'School Name' and 'Total Enrollment'",
+      "Step 2: Import the file",
+      "Step 3: Verify columns stored as school_name and total_enrollment",
+      "Step 4: Verify source_column_name in schema_metadata preserves original"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Schema detection correctly categorizes columns",
+    "steps": [
+      "Step 1: Create Excel file with columns from different categories",
+      "Step 2: Import with schema detection",
+      "Step 3: Verify demographic columns categorized as demographics",
+      "Step 4: Verify assessment columns categorized as assessment",
+      "Step 5: Verify enrollment columns categorized as enrollment"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Year-partitioned tables are created correctly for each year",
+    "steps": [
+      "Step 1: Import 2024 data",
+      "Step 2: Verify schools_2024 table created",
+      "Step 3: Import 2025 data with different schema",
+      "Step 4: Verify schools_2025 table created with its own schema",
+      "Step 5: Verify both tables coexist independently",
+      "Step 6: Verify schema differences are preserved (not merged)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "FTS5 full-text search index is created and synced",
+    "steps": [
+      "Step 1: Import entities into entities_master",
+      "Step 2: Verify FTS5 virtual table exists",
+      "Step 3: Insert new entity into entities_master",
+      "Step 4: Verify FTS5 index updated via trigger",
+      "Step 5: Update entity name in entities_master",
+      "Step 6: Verify FTS5 index reflects change",
+      "Step 7: Delete entity from entities_master",
+      "Step 8: Verify FTS5 index removes entry"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "API responses follow consistent JSON format for success",
+    "steps": [
+      "Step 1: Send GET /years and verify structure {data: [...], meta: {...}}",
+      "Step 2: Send GET /schools/2025 and verify same structure",
+      "Step 3: Send GET /schools/2025/{rcdts} and verify {data: {...}, meta: {...}}",
+      "Step 4: Send POST /query and verify consistent structure",
+      "Step 5: Verify all responses include appropriate meta fields"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "API responses follow consistent JSON format for errors",
+    "steps": [
+      "Step 1: Trigger 400 error and verify {error: {code, message, details}}",
+      "Step 2: Trigger 401 error and verify same structure",
+      "Step 3: Trigger 403 error and verify same structure",
+      "Step 4: Trigger 404 error and verify same structure",
+      "Step 5: Trigger 429 error and verify same structure with retry_after"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Usage logging captures all requests accurately",
+    "steps": [
+      "Step 1: Make authenticated request to any endpoint",
+      "Step 2: Query usage_logs table",
+      "Step 3: Verify entry contains api_key_id, endpoint, method",
+      "Step 4: Verify entry contains status_code, response_time_ms, timestamp",
+      "Step 5: Verify ip_address captured"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Database indexes are created for performance",
+    "steps": [
+      "Step 1: Check entities_master has unique index on rcdts",
+      "Step 2: Check entities_master has index on entity_type",
+      "Step 3: Check schools_YYYY has index on rcdts",
+      "Step 4: Check api_keys has unique index on key_hash",
+      "Step 5: Check usage_logs has indexes on api_key_id and timestamp"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "Swagger UI documentation is accessible and complete",
+    "steps": [
+      "Step 1: Navigate to /docs or /swagger",
+      "Step 2: Verify Swagger UI loads successfully",
+      "Step 3: Verify all endpoints are documented",
+      "Step 4: Verify each endpoint has description",
+      "Step 5: Verify request/response schemas are shown",
+      "Step 6: Take screenshot of main documentation page"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "OpenAPI schema includes examples for all endpoints",
+    "steps": [
+      "Step 1: Navigate to /openapi.json",
+      "Step 2: Verify schema contains example responses",
+      "Step 3: Verify request body examples provided",
+      "Step 4: Verify error response examples included"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Docker container builds and runs successfully",
+    "steps": [
+      "Step 1: Run docker build -t reportcard-api .",
+      "Step 2: Verify build completes without errors",
+      "Step 3: Run docker run -p 8000:8000 reportcard-api",
+      "Step 4: Verify container starts successfully",
+      "Step 5: Send GET /health to localhost:8000",
+      "Step 6: Verify healthy response received"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Docker-compose starts development environment",
+    "steps": [
+      "Step 1: Run docker-compose up",
+      "Step 2: Verify API container starts",
+      "Step 3: Verify volume mounts for data and app directories",
+      "Step 4: Send GET /health to localhost:8000",
+      "Step 5: Verify healthy response",
+      "Step 6: Verify environment variables are set correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Environment variables configure application correctly",
+    "steps": [
+      "Step 1: Set ENVIRONMENT=production",
+      "Step 2: Start application",
+      "Step 3: Verify production mode behavior",
+      "Step 4: Set DATABASE_URL to custom path",
+      "Step 5: Restart application",
+      "Step 6: Verify database created at custom path",
+      "Step 7: Set rate limit environment variables",
+      "Step 8: Verify rate limits applied correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "Error messages are user-friendly and informative",
+    "steps": [
+      "Step 1: Trigger validation error (invalid year)",
+      "Step 2: Verify error message clearly explains what's wrong",
+      "Step 3: Verify error includes available valid options",
+      "Step 4: Trigger not found error",
+      "Step 5: Verify error message includes the requested resource ID",
+      "Step 6: Take screenshot of error response examples"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Different rate limit tiers enforce different limits",
+    "steps": [
+      "Step 1: Create free tier key (100 req/min)",
+      "Step 2: Create standard tier key (1000 req/min)",
+      "Step 3: Create premium tier key (10000 req/min)",
+      "Step 4: Verify free key hits limit at 100",
+      "Step 5: Verify standard key can exceed 100 without limit",
+      "Step 6: Verify each tier enforces its specific limit"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "API key hashing prevents plaintext storage",
+    "steps": [
+      "Step 1: Create new API key via admin endpoint",
+      "Step 2: Query api_keys table directly",
+      "Step 3: Verify key_hash column contains SHA-256 hash (not plaintext)",
+      "Step 4: Verify key_prefix column contains first 8 characters",
+      "Step 5: Verify authentication works by hashing provided key and comparing"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Multi-sheet Excel files are processed correctly",
+    "steps": [
+      "Step 1: Create Excel file with multiple sheets (General, ACT, IAR, etc.)",
+      "Step 2: Import the file",
+      "Step 3: Verify data from all sheets is combined correctly",
+      "Step 4: Verify school records have data from all relevant sheets"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Empty cells and blank strings are converted to NULL",
+    "steps": [
+      "Step 1: Create Excel file with empty cells and blank strings",
+      "Step 2: Import the file",
+      "Step 3: Query the imported data",
+      "Step 4: Verify empty values stored as NULL (not empty string)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "style",
+    "description": "README.md contains complete setup and usage instructions",
+    "steps": [
+      "Step 1: Read README.md",
+      "Step 2: Verify overview section explains project purpose",
+      "Step 3: Verify setup instructions are complete and accurate",
+      "Step 4: Verify API usage examples included",
+      "Step 5: Verify deployment instructions present"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Test coverage meets 90%+ threshold",
+    "steps": [
+      "Step 1: Run pytest --cov=app --cov-report=term-missing",
+      "Step 2: Verify overall coverage is 90% or higher",
+      "Step 3: Identify any files below 90%",
+      "Step 4: Verify all critical paths have test coverage"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "All pytest tests pass without errors or warnings",
+    "steps": [
+      "Step 1: Run pytest with verbose output",
+      "Step 2: Verify all tests pass (green)",
+      "Step 3: Verify no deprecation warnings",
+      "Step 4: Verify no uncaught exceptions in test output"
+    ],
+    "passes": false
+  }
+]

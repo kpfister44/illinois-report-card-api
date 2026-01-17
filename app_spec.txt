@@ -1,0 +1,862 @@
+<project_specification>
+  <project_name>Illinois Report Card API</project_name>
+
+  <overview>
+    A comprehensive REST API for accessing Illinois public school data from the Illinois Report Card.
+    The API provides programmatic access to school, district, and state-level education data including
+    enrollment, demographics, assessment scores, and more. Designed to handle 20 years of historical
+    data with varying report card formats across years. Features include full-text search, flexible
+    querying, and a year-partitioned data architecture that gracefully handles format changes over time.
+  </overview>
+
+  <technology_stack>
+    <backend>
+      <runtime>Python 3.12+</runtime>
+      <framework>FastAPI</framework>
+      <database>SQLite with FTS5 for full-text search</database>
+      <orm>SQLAlchemy</orm>
+      <validation>Pydantic</validation>
+      <package_manager>uv</package_manager>
+    </backend>
+    <deployment>
+      <containerization>Docker</containerization>
+      <local_dev>docker-compose</local_dev>
+      <production>Railway, Fly.io, or any Docker-compatible platform</production>
+    </deployment>
+    <testing>
+      <framework>pytest</framework>
+      <methodology>Test-Driven Development (TDD)</methodology>
+      <coverage>pytest-cov</coverage>
+    </testing>
+  </technology_stack>
+
+  <data_source>
+    <name>Illinois Report Card Public Data Set</name>
+    <format>Excel (.xlsx) files</format>
+    <publisher>Illinois State Board of Education (ISBE)</publisher>
+    <scope>All Illinois public schools, districts, and state aggregates</scope>
+    <years>2024-25 initially, expanding to 20 years of historical data</years>
+    <columns>681+ columns per year (varies by year due to format changes)</columns>
+    <entities>~3,800 schools, ~850 districts, state-level aggregates</entities>
+    <format_changes>
+      - Post-2021: Current format
+      - 2015-2021: Modified format
+      - Pre-2015: Legacy format
+    </format_changes>
+  </data_source>
+
+  <architecture>
+    <overview>
+      Three-tier architecture with API routes, service layer, and data access layer.
+      Year-partitioned database tables handle format changes across different report card years.
+      API keys required for all requests with rate limiting per tier.
+    </overview>
+
+    <diagram>
+      ┌─────────────────────────────────────────────────────────┐
+      │                      Clients                            │
+      │         (Web apps, mobile apps, data analysts)          │
+      └──────────────────────────┬──────────────────────────────┘
+                                 │ API Key Required
+                                 ▼
+      ┌─────────────────────────────────────────────────────────┐
+      │                    FastAPI Application                  │
+      │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │
+      │  │  REST API   │  │ Query API   │  │   Admin API     │  │
+      │  │ /schools    │  │ /query      │  │ /admin/import   │  │
+      │  │ /districts  │  │             │  │ /admin/keys     │  │
+      │  │ /search     │  │             │  │                 │  │
+      │  └─────────────┘  └─────────────┘  └─────────────────┘  │
+      │                           │                             │
+      │  ┌─────────────────────────────────────────────────┐    │
+      │  │              Service Layer                      │    │
+      │  │  - Data retrieval    - Schema introspection     │    │
+      │  │  - Search logic      - Import processing        │    │
+      │  └─────────────────────────────────────────────────┘    │
+      └──────────────────────────┬──────────────────────────────┘
+                                 │
+                                 ▼
+      ┌─────────────────────────────────────────────────────────┐
+      │                    SQLite Database                      │
+      │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
+      │  │entities_master│ │ schools_2025 │  │districts_2025│   │
+      │  │ (RCDTS, name) │ │ (681 cols)   │  │ (per year)   │   │
+      │  └──────────────┘  └──────────────┘  └──────────────┘   │
+      │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
+      │  │schema_metadata│ │  api_keys    │  │  usage_logs  │   │
+      │  └──────────────┘  └──────────────┘  └──────────────┘   │
+      └─────────────────────────────────────────────────────────┘
+    </diagram>
+
+    <key_decisions>
+      - Year-partitioned tables: Each year gets its own table (schools_2025, schools_2024) to handle format changes
+      - Schema metadata: Tracks what columns exist in each year for API introspection
+      - Hybrid API: Core REST endpoints plus flexible /query for advanced use cases
+      - API keys required: All requests authenticated, enables rate limiting and usage tracking
+      - Import all data: Store all 681 columns, expose via API as endpoints evolve
+    </key_decisions>
+  </architecture>
+
+  <database_schema>
+    <tables>
+      <entities_master>
+        - id (INTEGER PRIMARY KEY)
+        - rcdts (TEXT UNIQUE) - Regional County District Type School identifier
+        - entity_type (TEXT) - school | district | state | region
+        - name (TEXT)
+        - city (TEXT)
+        - county (TEXT)
+        - created_at (TIMESTAMP)
+      </entities_master>
+
+      <schools_YYYY description="One table per year, schema matches that year's report card">
+        - id (INTEGER PRIMARY KEY)
+        - rcdts (TEXT) - FK to entities_master
+        - ... all columns from that year's report card (681+ columns for recent years) ...
+        - imported_at (TIMESTAMP)
+      </schools_YYYY>
+
+      <districts_YYYY description="One table per year for district-level data">
+        - id (INTEGER PRIMARY KEY)
+        - district_id (TEXT)
+        - ... district-level columns from that year ...
+        - imported_at (TIMESTAMP)
+      </districts_YYYY>
+
+      <state_YYYY description="One table per year for state aggregates">
+        - id (INTEGER PRIMARY KEY)
+        - ... state-level columns from that year ...
+        - imported_at (TIMESTAMP)
+      </state_YYYY>
+
+      <schema_metadata description="Documents what columns exist in each year">
+        - id (INTEGER PRIMARY KEY)
+        - year (INTEGER)
+        - table_name (TEXT) - schools_2025, districts_2025, etc.
+        - column_name (TEXT)
+        - data_type (TEXT) - string | integer | float | percentage
+        - category (TEXT) - demographics | assessment | enrollment | attendance | etc.
+        - description (TEXT)
+        - source_column_name (TEXT) - original Excel column name
+        - is_suppressed_indicator (BOOLEAN) - marks columns that use * for privacy
+      </schema_metadata>
+
+      <api_keys>
+        - id (INTEGER PRIMARY KEY)
+        - key_hash (TEXT) - hashed API key
+        - key_prefix (TEXT) - first 8 chars for identification (e.g., "rc_live_a1b2...")
+        - owner_email (TEXT)
+        - owner_name (TEXT)
+        - created_at (TIMESTAMP)
+        - last_used_at (TIMESTAMP)
+        - is_active (BOOLEAN)
+        - rate_limit_tier (TEXT) - free | standard | premium
+        - is_admin (BOOLEAN)
+        - notes (TEXT)
+      </api_keys>
+
+      <usage_logs>
+        - id (INTEGER PRIMARY KEY)
+        - api_key_id (INTEGER) - FK to api_keys
+        - endpoint (TEXT)
+        - method (TEXT)
+        - status_code (INTEGER)
+        - response_time_ms (INTEGER)
+        - timestamp (TIMESTAMP)
+        - ip_address (TEXT)
+      </usage_logs>
+    </tables>
+
+    <indexes>
+      - entities_master.rcdts - UNIQUE INDEX
+      - entities_master.entity_type - INDEX for filtering
+      - schools_YYYY.rcdts - INDEX for joins to master
+      - api_keys.key_hash - UNIQUE INDEX
+      - usage_logs.api_key_id - INDEX
+      - usage_logs.timestamp - INDEX
+    </indexes>
+
+    <full_text_search>
+      - FTS5 virtual table on entities_master(name, city, county)
+      - Auto-sync triggers for INSERT/UPDATE/DELETE
+      - Query sanitization for special characters
+    </full_text_search>
+  </database_schema>
+
+  <api_endpoints>
+    <authentication>
+      All endpoints except /health require API key in header:
+      Authorization: Bearer rc_live_xxxxxxxx
+    </authentication>
+
+    <meta_endpoints>
+      <endpoint>
+        <method>GET</method>
+        <path>/health</path>
+        <auth>None</auth>
+        <description>Health check endpoint</description>
+        <response>{"status": "ok"}</response>
+      </endpoint>
+
+      <endpoint>
+        <method>GET</method>
+        <path>/years</path>
+        <description>List all available data years</description>
+        <response>{"data": [2025, 2024, 2023, ...], "meta": {"count": 20}}</response>
+      </endpoint>
+
+      <endpoint>
+        <method>GET</method>
+        <path>/schema/{year}</path>
+        <description>Get field metadata for a specific year</description>
+        <response>{"data": [{"column_name": "...", "data_type": "...", "category": "...", ...}]}</response>
+      </endpoint>
+
+      <endpoint>
+        <method>GET</method>
+        <path>/schema/{year}/{category}</path>
+        <description>Get fields filtered by category (demographics, assessment, etc.)</description>
+        <response>{"data": [...]}</response>
+      </endpoint>
+    </meta_endpoints>
+
+    <school_endpoints>
+      <endpoint>
+        <method>GET</method>
+        <path>/schools/{year}</path>
+        <description>List schools with filtering and pagination</description>
+        <query_params>
+          - fields: comma-separated list of fields to include
+          - city: filter by city
+          - county: filter by county
+          - type: filter by school type (elementary, middle, high)
+          - limit: max results (default 100, max 1000)
+          - offset: pagination offset
+          - sort: field to sort by
+          - order: asc | desc
+        </query_params>
+        <response>{"data": [...], "meta": {"total": 3827, "limit": 100, "offset": 0}}</response>
+      </endpoint>
+
+      <endpoint>
+        <method>GET</method>
+        <path>/schools/{year}/{rcdts}</path>
+        <description>Get single school detail</description>
+        <query_params>
+          - fields: comma-separated list of fields to include (default: all)
+        </query_params>
+        <response>{"data": {...}, "meta": {"year": 2025, "fields_returned": 681}}</response>
+      </endpoint>
+    </school_endpoints>
+
+    <district_endpoints>
+      <endpoint>
+        <method>GET</method>
+        <path>/districts/{year}</path>
+        <description>List districts with filtering and pagination</description>
+        <query_params>Same as /schools/{year}</query_params>
+      </endpoint>
+
+      <endpoint>
+        <method>GET</method>
+        <path>/districts/{year}/{district_id}</path>
+        <description>Get single district detail</description>
+      </endpoint>
+    </district_endpoints>
+
+    <state_endpoints>
+      <endpoint>
+        <method>GET</method>
+        <path>/state/{year}</path>
+        <description>Get state-level aggregate data</description>
+        <query_params>
+          - fields: comma-separated list of fields to include
+        </query_params>
+      </endpoint>
+    </state_endpoints>
+
+    <search_endpoint>
+      <endpoint>
+        <method>GET</method>
+        <path>/search</path>
+        <description>Full-text search across entities</description>
+        <query_params>
+          - q: search query (required, min 1 char)
+          - year: filter by year (optional)
+          - type: filter by entity type (school, district, state)
+          - limit: max results (default 10, max 50)
+        </query_params>
+        <response>{"data": [{"rcdts": "...", "name": "...", "city": "...", "entity_type": "school", ...}], "meta": {"total": 45}}</response>
+      </endpoint>
+    </search_endpoint>
+
+    <query_endpoint>
+      <endpoint>
+        <method>POST</method>
+        <path>/query</path>
+        <description>Flexible query endpoint for advanced use cases</description>
+        <request_body>
+          {
+            "year": 2025,
+            "entity_type": "school",
+            "fields": ["rcdts", "name", "enrollment", "act_composite"],
+            "filters": {
+              "city": "Chicago",
+              "school_type": "high",
+              "enrollment": {"gte": 500}
+            },
+            "sort": {"field": "enrollment", "order": "desc"},
+            "limit": 100,
+            "offset": 0
+          }
+        </request_body>
+        <response>{"data": [...], "meta": {"total": 125, "limit": 100, "offset": 0}}</response>
+      </endpoint>
+    </query_endpoint>
+
+    <admin_endpoints>
+      <endpoint>
+        <method>POST</method>
+        <path>/admin/import</path>
+        <auth>Admin API key required</auth>
+        <description>Upload and import Excel file</description>
+        <request>multipart/form-data with file, year, detect_schema (optional)</request>
+        <response>{"data": {"import_id": "imp_abc123", "status": "processing", "year": 2025}}</response>
+      </endpoint>
+
+      <endpoint>
+        <method>GET</method>
+        <path>/admin/import/status/{import_id}</path>
+        <auth>Admin API key required</auth>
+        <description>Check import job status</description>
+        <response>{"data": {"import_id": "...", "status": "completed", "records_imported": 3827}}</response>
+      </endpoint>
+
+      <endpoint>
+        <method>GET</method>
+        <path>/admin/keys</path>
+        <auth>Admin API key required</auth>
+        <description>List all API keys</description>
+      </endpoint>
+
+      <endpoint>
+        <method>POST</method>
+        <path>/admin/keys</path>
+        <auth>Admin API key required</auth>
+        <description>Create new API key</description>
+        <request_body>{"owner_email": "...", "owner_name": "...", "rate_limit_tier": "free"}</request_body>
+        <response>{"data": {"key": "rc_live_xxxxxxxx", "key_prefix": "rc_live_x"}}</response>
+        <note>Full key only returned once at creation time</note>
+      </endpoint>
+
+      <endpoint>
+        <method>DELETE</method>
+        <path>/admin/keys/{key_id}</path>
+        <auth>Admin API key required</auth>
+        <description>Revoke an API key</description>
+      </endpoint>
+
+      <endpoint>
+        <method>GET</method>
+        <path>/admin/usage</path>
+        <auth>Admin API key required</auth>
+        <description>Get usage statistics</description>
+        <query_params>
+          - start_date: filter start
+          - end_date: filter end
+          - api_key_id: filter by specific key
+        </query_params>
+      </endpoint>
+    </admin_endpoints>
+  </api_endpoints>
+
+  <response_formats>
+    <success_responses>
+      <single_resource>
+        {
+          "data": {
+            "rcdts": "05-016-2140-17-0002",
+            "name": "Lincoln Elementary",
+            "city": "Springfield",
+            "year": 2025,
+            "enrollment": 425,
+            ...
+          },
+          "meta": {
+            "year": 2025,
+            "fields_returned": 45
+          }
+        }
+      </single_resource>
+
+      <list_response>
+        {
+          "data": [...],
+          "meta": {
+            "total": 653,
+            "limit": 10,
+            "offset": 0,
+            "year": 2025
+          }
+        }
+      </list_response>
+    </success_responses>
+
+    <error_responses>
+      <bad_request>
+        HTTP 400
+        {
+          "error": {
+            "code": "INVALID_PARAMETER",
+            "message": "Invalid year: 2030. Available years: 2015-2025",
+            "details": {"parameter": "year", "value": "2030"}
+          }
+        }
+      </bad_request>
+
+      <unauthorized>
+        HTTP 401
+        {
+          "error": {
+            "code": "INVALID_API_KEY",
+            "message": "API key is missing or invalid"
+          }
+        }
+      </unauthorized>
+
+      <forbidden>
+        HTTP 403
+        {
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Admin access required for this endpoint"
+          }
+        }
+      </forbidden>
+
+      <not_found>
+        HTTP 404
+        {
+          "error": {
+            "code": "NOT_FOUND",
+            "message": "School not found: 99-999-9999-99-9999"
+          }
+        }
+      </not_found>
+
+      <rate_limited>
+        HTTP 429
+        {
+          "error": {
+            "code": "RATE_LIMITED",
+            "message": "Rate limit exceeded. Retry after 60 seconds.",
+            "details": {"retry_after": 60}
+          }
+        }
+      </rate_limited>
+
+      <server_error>
+        HTTP 500
+        {
+          "error": {
+            "code": "INTERNAL_ERROR",
+            "message": "An unexpected error occurred"
+          }
+        }
+      </server_error>
+    </error_responses>
+
+    <http_status_codes>
+      - 200: Success
+      - 201: Created (new API key, import started)
+      - 400: Bad request / validation error
+      - 401: Missing or invalid API key
+      - 403: Forbidden (non-admin on admin endpoint)
+      - 404: Resource not found
+      - 429: Rate limited
+      - 500: Internal server error
+    </http_status_codes>
+  </response_formats>
+
+  <data_import>
+    <overview>
+      Data import supports both CLI commands for bulk operations and admin API
+      endpoints for convenience. The import process auto-detects column types
+      and categories, creating year-specific tables that match each year's
+      report card format exactly.
+    </overview>
+
+    <process_flow>
+      1. Parse Excel file and detect year/format
+      2. Read all sheets (General, ACT, IAR, etc.)
+      3. Detect schema: column types, categories, suppression indicators
+      4. Create year-partitioned table if not exists (schools_YYYY)
+      5. Clean data: convert percentages, handle suppressed (*) values
+      6. Insert records into year table
+      7. Update/insert entities_master with stable identifiers
+      8. Populate schema_metadata with column documentation
+    </process_flow>
+
+    <cli_commands>
+      # Import a single year
+      python -m app.cli.import_data data/2025-Report-Card.xlsx --year 2025
+
+      # Import with explicit schema detection
+      python -m app.cli.import_data data/2015-Report-Card.xlsx --year 2015 --detect-schema
+
+      # Dry run to preview import
+      python -m app.cli.import_data data/2025-Report-Card.xlsx --year 2025 --dry-run
+
+      # List available years in database
+      python -m app.cli.import_data --list-years
+    </cli_commands>
+
+    <data_cleaning>
+      - Asterisks (*) converted to NULL (privacy-suppressed data)
+      - Percentage strings (e.g., "75.5%") converted to floats
+      - Enrollment strings with commas (e.g., "1,250") converted to integers
+      - Empty strings converted to NULL
+      - Column names normalized (spaces to underscores, lowercase)
+    </data_cleaning>
+
+    <schema_detection>
+      - Automatically categorizes columns based on naming patterns
+      - Categories: demographics, assessment, enrollment, attendance, graduation, etc.
+      - Detects data types: integer, float, percentage, string
+      - Flags columns that use * for privacy suppression
+      - Stores original Excel column names for reference
+    </schema_detection>
+  </data_import>
+
+  <authentication_and_rate_limiting>
+    <api_keys>
+      - All requests (except /health) require API key
+      - Header format: Authorization: Bearer rc_live_xxxxxxxx
+      - Keys are hashed before storage (SHA-256)
+      - Key prefix stored for identification in logs
+      - Admin keys have is_admin=true flag
+    </api_keys>
+
+    <rate_limiting>
+      <tiers>
+        - free: 100 requests per minute
+        - standard: 1000 requests per minute
+        - premium: 10000 requests per minute
+      </tiers>
+      <implementation>
+        - Sliding window rate limiting
+        - 429 response with retry_after when exceeded
+        - Tracked in usage_logs table
+      </implementation>
+    </rate_limiting>
+  </authentication_and_rate_limiting>
+
+  <project_structure>
+    ReportCardAPI/
+    ├── app/
+    │   ├── __init__.py
+    │   ├── main.py                 # FastAPI app entry point
+    │   ├── config.py               # Settings, environment variables
+    │   ├── dependencies.py         # Dependency injection (db, auth)
+    │   │
+    │   ├── api/
+    │   │   ├── __init__.py
+    │   │   ├── health.py           # GET /health
+    │   │   ├── meta.py             # GET /years, /schema
+    │   │   ├── schools.py          # School endpoints
+    │   │   ├── districts.py        # District endpoints
+    │   │   ├── state.py            # State aggregate endpoints
+    │   │   ├── search.py           # GET /search
+    │   │   ├── query.py            # POST /query
+    │   │   └── admin.py            # Admin endpoints
+    │   │
+    │   ├── services/
+    │   │   ├── __init__.py
+    │   │   ├── data_service.py     # Data retrieval logic
+    │   │   ├── search_service.py   # Search logic
+    │   │   ├── query_service.py    # Flexible query builder
+    │   │   ├── import_service.py   # Import orchestration
+    │   │   └── auth_service.py     # API key validation, rate limiting
+    │   │
+    │   ├── models/
+    │   │   ├── __init__.py
+    │   │   ├── database.py         # SQLAlchemy models
+    │   │   ├── requests.py         # Pydantic request models
+    │   │   └── responses.py        # Pydantic response models
+    │   │
+    │   ├── cli/
+    │   │   ├── __init__.py
+    │   │   └── import_data.py      # CLI import command
+    │   │
+    │   └── utils/
+    │       ├── __init__.py
+    │       ├── excel_parser.py     # Excel file reading
+    │       ├── schema_detector.py  # Auto-detect column types/categories
+    │       └── data_cleaners.py    # Data normalization
+    │
+    ├── tests/
+    │   ├── __init__.py
+    │   ├── conftest.py             # Pytest fixtures
+    │   ├── test_api/               # Endpoint tests
+    │   │   ├── test_health.py
+    │   │   ├── test_meta.py
+    │   │   ├── test_schools.py
+    │   │   ├── test_districts.py
+    │   │   ├── test_search.py
+    │   │   ├── test_query.py
+    │   │   ├── test_admin.py
+    │   │   └── test_auth.py
+    │   ├── test_services/          # Service layer tests
+    │   │   ├── test_data_service.py
+    │   │   ├── test_search_service.py
+    │   │   ├── test_query_service.py
+    │   │   ├── test_import_service.py
+    │   │   └── test_auth_service.py
+    │   └── test_utils/             # Utility function tests
+    │       ├── test_excel_parser.py
+    │       ├── test_schema_detector.py
+    │       └── test_data_cleaners.py
+    │
+    ├── data/
+    │   └── reportcard.db           # SQLite database
+    │
+    ├── Dockerfile
+    ├── docker-compose.yml
+    ├── pyproject.toml              # Dependencies (uv)
+    ├── README.md
+    └── CLAUDE.md
+  </project_structure>
+
+  <testing>
+    <methodology>Test-Driven Development (TDD)</methodology>
+    <framework>pytest with pytest-cov</framework>
+
+    <workflow>
+      1. Write failing test for desired behavior
+      2. Run test to confirm it fails
+      3. Write minimal code to pass
+      4. Run test to confirm it passes
+      5. Refactor if needed, keeping tests green
+    </workflow>
+
+    <test_fixtures>
+      - test_db: In-memory SQLite with sample data (~10 schools, 2 years)
+      - test_client: FastAPI TestClient
+      - test_api_key: Valid test API key
+      - test_admin_key: Valid admin API key
+      - sample_excel_file: Minimal Excel for import tests
+    </test_fixtures>
+
+    <test_data>
+      - ~10 schools across 2 years (2024, 2025)
+      - Different entity types (elementary, middle, high)
+      - Different cities/counties for filtering tests
+      - Include edge cases: suppressed data (*), missing fields
+      - Include district and state level records
+    </test_data>
+
+    <commands>
+      # Run all tests
+      pytest
+
+      # Run with coverage
+      pytest --cov=app --cov-report=term-missing
+
+      # Run specific test file
+      pytest tests/test_api/test_schools.py
+
+      # Run tests matching pattern
+      pytest -k "test_search"
+    </commands>
+  </testing>
+
+  <docker>
+    <dockerfile>
+      FROM python:3.12-slim
+
+      WORKDIR /app
+
+      # Install uv for fast dependency management
+      RUN pip install uv
+
+      # Copy dependency files
+      COPY pyproject.toml .
+      RUN uv pip install --system -e .
+
+      # Copy application code
+      COPY app/ app/
+      COPY data/ data/
+
+      EXPOSE 8000
+
+      CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    </dockerfile>
+
+    <docker_compose>
+      services:
+        api:
+          build: .
+          ports:
+            - "8000:8000"
+          volumes:
+            - ./data:/app/data
+            - ./app:/app/app
+          environment:
+            - ENVIRONMENT=development
+            - DATABASE_URL=sqlite:///./data/reportcard.db
+    </docker_compose>
+
+    <environment_variables>
+      ENVIRONMENT=development|production
+      DATABASE_URL=sqlite:///./data/reportcard.db
+      ADMIN_API_KEY=<initial admin key for bootstrapping>
+      RATE_LIMIT_REQUESTS=100
+      RATE_LIMIT_WINDOW_SECONDS=60
+    </environment_variables>
+  </docker>
+
+  <implementation_phases>
+    <phase number="1">
+      <title>Foundation</title>
+      <tasks>
+        - Initialize project structure with FastAPI
+        - Set up pyproject.toml with dependencies
+        - Configure SQLite database connection
+        - Create core tables (entities_master, api_keys, schema_metadata, usage_logs)
+        - Implement API key authentication middleware
+        - Create /health endpoint
+        - Set up Docker and docker-compose
+        - Write initial tests for auth middleware
+      </tasks>
+    </phase>
+
+    <phase number="2">
+      <title>Data Import Pipeline</title>
+      <tasks>
+        - Build Excel parser (leverage patterns from IllinoisSchoolData project)
+        - Implement schema detection for column types/categories
+        - Create data cleaning utilities (percentages, suppressed values, etc.)
+        - Build year-partitioned table creation logic
+        - Implement CLI import command
+        - Populate schema_metadata on import
+        - Write tests for import pipeline
+      </tasks>
+    </phase>
+
+    <phase number="3">
+      <title>Core REST API</title>
+      <tasks>
+        - Implement /years endpoint
+        - Implement /schema/{year} and /schema/{year}/{category} endpoints
+        - Implement /schools/{year} with filtering and pagination
+        - Implement /schools/{year}/{rcdts} single school detail
+        - Implement /districts/{year} and /districts/{year}/{district_id}
+        - Implement /state/{year}
+        - Write comprehensive endpoint tests
+      </tasks>
+    </phase>
+
+    <phase number="4">
+      <title>Search</title>
+      <tasks>
+        - Set up FTS5 virtual table with triggers
+        - Implement search service with query sanitization
+        - Implement /search endpoint with filtering
+        - Add relevance ranking to search results
+        - Write search tests including edge cases
+      </tasks>
+    </phase>
+
+    <phase number="5">
+      <title>Flexible Query API</title>
+      <tasks>
+        - Design query request schema
+        - Build query parser and validator
+        - Implement dynamic SQL generation (safely)
+        - Implement POST /query endpoint
+        - Support field selection, filtering, sorting, pagination
+        - Support comparison operators (eq, gt, gte, lt, lte, in)
+        - Write comprehensive query tests
+      </tasks>
+    </phase>
+
+    <phase number="6">
+      <title>Admin Features</title>
+      <tasks>
+        - Implement /admin/import file upload endpoint
+        - Implement /admin/import/status/{id}
+        - Implement /admin/keys CRUD endpoints
+        - Implement /admin/usage statistics endpoint
+        - Implement rate limiting with sliding window
+        - Write admin endpoint tests
+      </tasks>
+    </phase>
+
+    <phase number="7">
+      <title>Polish and Documentation</title>
+      <tasks>
+        - Enhance Swagger/OpenAPI documentation with examples
+        - Add detailed endpoint descriptions
+        - Add response schema examples
+        - Performance optimization (query analysis, indexes)
+        - Error message refinement
+        - README documentation
+        - Ensure comprehensive test coverage
+      </tasks>
+    </phase>
+  </implementation_phases>
+
+  <success_criteria>
+    <functionality>
+      - All endpoints return correct data with proper status codes
+      - Search returns relevant results ranked by relevance
+      - Flexible query handles all filter/sort/pagination combinations
+      - Import successfully processes Excel files from multiple years
+      - API keys authenticate requests and rate limiting works
+      - Year-partitioned tables handle different report card formats
+    </functionality>
+
+    <technical_quality>
+      - Clean, maintainable code following project conventions
+      - Comprehensive test coverage (aim for 90%+)
+      - TDD methodology followed throughout
+      - Proper error handling with consistent error format
+      - Secure API key storage (hashed)
+      - No SQL injection vulnerabilities
+      - Efficient database queries with proper indexes
+    </technical_quality>
+
+    <documentation>
+      - Swagger UI provides complete API documentation
+      - All endpoints have descriptions and examples
+      - README explains setup, usage, and deployment
+      - Schema metadata enables API introspection
+    </documentation>
+
+    <deployment>
+      - Docker image builds successfully
+      - docker-compose enables local development
+      - Application runs on Railway or equivalent platform
+      - Environment variables configure all settings
+    </deployment>
+  </success_criteria>
+
+  <existing_code_reference>
+    <project>IllinoisSchoolData</project>
+    <location>/Users/kyle.pfister/IllinoisSchoolData</location>
+    <reusable_patterns>
+      - Excel parsing logic from backend/app/utils/import_data.py
+      - Data cleaning functions (clean_percentage, clean_enrollment)
+      - SAT-to-ACT conversion from import_historical_trends.py
+      - FTS5 search setup and query sanitization from database.py
+      - Pydantic response model patterns from models.py
+    </reusable_patterns>
+    <key_differences>
+      - This API imports ALL columns (681+) vs curated subset
+      - Year-partitioned tables vs single denormalized table
+      - API key authentication vs open access
+      - Flexible /query endpoint vs fixed endpoints only
+      - Schema metadata for dynamic field discovery
+    </key_differences>
+  </existing_code_reference>
+</project_specification>
