@@ -62,7 +62,7 @@
     "description": "Rate limiting enforces tier limits and returns 429 when exceeded",
     "steps": [
       "Step 1: Create a free tier API key (100 requests/minute limit)",
-      "Step 2: Send 100 requests to /health endpoint in rapid succession",
+      "Step 2: Send 100 requests to /years endpoint with the API key in rapid succession",
       "Step 3: Verify all 100 requests return 200 status",
       "Step 4: Send 101st request within the same minute window",
       "Step 5: Verify response status code is 429",
@@ -118,17 +118,17 @@
     "category": "functional",
     "description": "GET /schools/{year} returns list of schools with pagination",
     "steps": [
-      "Step 1: Import test data with at least 20 schools for year 2025",
+      "Step 1: Import test data with at least 150 schools for year 2025",
       "Step 2: Send authenticated GET request to /schools/2025",
       "Step 3: Verify response status code is 200",
       "Step 4: Verify response has data array with school objects",
       "Step 5: Verify response has meta with total, limit, and offset",
-      "Step 6: Verify default limit is 100",
-      "Step 7: Send GET request with ?limit=5&offset=0",
-      "Step 8: Verify exactly 5 schools returned",
-      "Step 9: Send GET request with ?limit=5&offset=5",
-      "Step 10: Verify next 5 schools returned (no overlap with previous)",
-      "Step 11: Verify meta.total reflects actual total count"
+      "Step 6: Verify default limit of 100 is applied (exactly 100 schools returned)",
+      "Step 7: Verify meta.total reflects actual total count (150+)",
+      "Step 8: Send GET request with ?limit=5&offset=0",
+      "Step 9: Verify exactly 5 schools returned",
+      "Step 10: Send GET request with ?limit=5&offset=5",
+      "Step 11: Verify next 5 schools returned (no overlap with previous)"
     ],
     "passes": false
   },
@@ -207,15 +207,30 @@
   },
   {
     "category": "functional",
-    "description": "GET /schools/{year}/{rcdts} returns single school with all fields",
+    "description": "GET /schools/{year} supports combining multiple filters",
     "steps": [
-      "Step 1: Import a school with rcdts 05-016-2140-17-0002",
+      "Step 1: Import schools with various cities and types (Chicago elementary, Chicago high, Springfield high)",
+      "Step 2: Send authenticated GET request to /schools/2025?city=Chicago&type=high",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify all returned schools are in Chicago AND are high schools",
+      "Step 5: Verify Chicago elementary schools are NOT included",
+      "Step 6: Verify Springfield high schools are NOT included",
+      "Step 7: Send GET request with ?city=Chicago&county=Cook&type=elementary",
+      "Step 8: Verify all three filters are applied together correctly"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /schools/{year}/{rcdts} returns single school with all available fields",
+    "steps": [
+      "Step 1: Import a school with rcdts 05-016-2140-17-0002 and known set of columns",
       "Step 2: Send authenticated GET request to /schools/2025/05-016-2140-17-0002",
       "Step 3: Verify response status code is 200",
       "Step 4: Verify response has data object (not array)",
-      "Step 5: Verify data contains all 681+ columns from the year's schema",
+      "Step 5: Verify data contains all columns that exist in the schools_2025 table for this record",
       "Step 6: Verify meta.year equals 2025",
-      "Step 7: Verify meta.fields_returned reflects total fields"
+      "Step 7: Verify meta.fields_returned matches actual number of fields in response"
     ],
     "passes": false
   },
@@ -225,8 +240,9 @@
     "steps": [
       "Step 1: Send authenticated GET request to /schools/2025/05-016-2140-17-0002?fields=name,enrollment,act_composite",
       "Step 2: Verify response status code is 200",
-      "Step 3: Verify only requested fields are present in response",
-      "Step 4: Verify rcdts is always included (identifier field)"
+      "Step 3: Verify only requested fields are present in response data",
+      "Step 4: Verify unrequested fields are NOT present in response",
+      "Step 5: Note: rcdts may or may not be included depending on implementation choice"
     ],
     "passes": false
   },
@@ -270,6 +286,54 @@
   },
   {
     "category": "functional",
+    "description": "GET /districts/{year} filters by city",
+    "steps": [
+      "Step 1: Import districts in multiple cities (Chicago, Springfield, Peoria)",
+      "Step 2: Send authenticated GET request to /districts/2025?city=Chicago",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify all returned districts have city equal to Chicago",
+      "Step 5: Verify districts from other cities are not included"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /districts/{year} filters by county",
+    "steps": [
+      "Step 1: Import districts in multiple counties",
+      "Step 2: Send authenticated GET request to /districts/2025?county=Cook",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify all returned districts have county equal to Cook",
+      "Step 5: Verify districts from other counties are not included"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /districts/{year} supports field selection",
+    "steps": [
+      "Step 1: Send authenticated GET request to /districts/2025?fields=district_id,name,city",
+      "Step 2: Verify response status code is 200",
+      "Step 3: Verify each district object only contains requested fields",
+      "Step 4: Verify no other fields are present in the response"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /districts/{year} supports sorting",
+    "steps": [
+      "Step 1: Import districts with varying data",
+      "Step 2: Send authenticated GET request to /districts/2025?sort=name&order=asc",
+      "Step 3: Verify response status code is 200",
+      "Step 4: Verify districts are ordered alphabetically by name ascending",
+      "Step 5: Send GET request with ?sort=name&order=desc",
+      "Step 6: Verify districts are ordered alphabetically descending"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
     "description": "GET /districts/{year}/{district_id} returns single district detail",
     "steps": [
       "Step 1: Import a district with known district_id",
@@ -292,6 +356,17 @@
   },
   {
     "category": "functional",
+    "description": "GET /districts/{year} returns 400 for invalid year",
+    "steps": [
+      "Step 1: Send authenticated GET request to /districts/2030",
+      "Step 2: Verify response status code is 400",
+      "Step 3: Verify error response has code INVALID_PARAMETER",
+      "Step 4: Verify error message indicates available years"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
     "description": "GET /state/{year} returns state-level aggregate data",
     "steps": [
       "Step 1: Import state-level data for year 2025",
@@ -309,6 +384,17 @@
       "Step 1: Send authenticated GET request to /state/2025?fields=total_enrollment,avg_act_composite",
       "Step 2: Verify response status code is 200",
       "Step 3: Verify only requested fields are present"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /state/{year} returns 400 for invalid year",
+    "steps": [
+      "Step 1: Send authenticated GET request to /state/2030",
+      "Step 2: Verify response status code is 400",
+      "Step 3: Verify error response has code INVALID_PARAMETER",
+      "Step 4: Verify error message indicates available years"
     ],
     "passes": false
   },
@@ -541,6 +627,58 @@
   },
   {
     "category": "functional",
+    "description": "POST /admin/import rejects invalid file types with 400 error",
+    "steps": [
+      "Step 1: Create a PDF file or text file (not Excel)",
+      "Step 2: Send authenticated POST to /admin/import with admin API key",
+      "Step 3: Include multipart/form-data with the non-Excel file and year=2025",
+      "Step 4: Verify response status code is 400",
+      "Step 5: Verify error response has code INVALID_FILE_TYPE",
+      "Step 6: Verify error message indicates Excel file required"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "POST /admin/import handles corrupt Excel file gracefully",
+    "steps": [
+      "Step 1: Create a corrupt/invalid Excel file (e.g., truncated or malformed)",
+      "Step 2: Send authenticated POST to /admin/import with admin API key",
+      "Step 3: Include multipart/form-data with the corrupt file and year=2025",
+      "Step 4: Verify response returns appropriate error (400 or import fails)",
+      "Step 5: Verify error message indicates file parsing failed",
+      "Step 6: Verify no partial data was imported to database"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "GET /admin/import/status returns 404 for non-existent import_id",
+    "steps": [
+      "Step 1: Send authenticated GET to /admin/import/status/nonexistent_import_id with admin key",
+      "Step 2: Verify response status code is 404",
+      "Step 3: Verify error response has code NOT_FOUND",
+      "Step 4: Verify error message includes the requested import_id"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Re-importing data for an existing year replaces previous data",
+    "steps": [
+      "Step 1: Import 2025 data with 10 schools via CLI or admin API",
+      "Step 2: Verify schools_2025 table has 10 records",
+      "Step 3: Create a modified Excel file with 15 schools for 2025",
+      "Step 4: Re-import 2025 data with the modified file",
+      "Step 5: Verify import completes successfully",
+      "Step 6: Verify schools_2025 table now has 15 records (replaced, not appended)",
+      "Step 7: Verify schema_metadata is updated if columns changed",
+      "Step 8: Verify entities_master is updated with any new entities"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
     "description": "Admin endpoint POST /admin/keys creates new API key",
     "steps": [
       "Step 1: Send authenticated POST to /admin/keys with admin key",
@@ -631,6 +769,20 @@
   },
   {
     "category": "functional",
+    "description": "CLI import --detect-schema explicitly triggers schema detection",
+    "steps": [
+      "Step 1: Create Excel file with columns not previously imported",
+      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2015 --detect-schema",
+      "Step 3: Verify command completes successfully",
+      "Step 4: Verify schools_2015 table created with detected schema",
+      "Step 5: Verify schema_metadata populated with column_name, data_type, and category for each column",
+      "Step 6: Verify data_type detection (integers, floats, percentages, strings identified correctly)",
+      "Step 7: Verify category detection (demographics, assessment, enrollment columns categorized)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
     "description": "Data import converts percentage strings to floats",
     "steps": [
       "Step 1: Create Excel file with percentage values like 75.5%",
@@ -676,13 +828,18 @@
   },
   {
     "category": "functional",
-    "description": "Schema detection correctly categorizes columns",
+    "description": "Schema detection correctly identifies column types and categories",
     "steps": [
-      "Step 1: Create Excel file with columns from different categories",
-      "Step 2: Import with schema detection",
-      "Step 3: Verify demographic columns categorized as demographics",
-      "Step 4: Verify assessment columns categorized as assessment",
-      "Step 5: Verify enrollment columns categorized as enrollment"
+      "Step 1: Create Excel file with columns of different types (integers, floats, percentages, strings)",
+      "Step 2: Include columns from different categories (demographics, assessment, enrollment)",
+      "Step 3: Import with schema detection",
+      "Step 4: Verify integer columns have data_type 'integer' in schema_metadata",
+      "Step 5: Verify float columns have data_type 'float' in schema_metadata",
+      "Step 6: Verify percentage columns (e.g., '75.5%') have data_type 'percentage' in schema_metadata",
+      "Step 7: Verify string columns have data_type 'string' in schema_metadata",
+      "Step 8: Verify demographic columns categorized as 'demographics'",
+      "Step 9: Verify assessment columns categorized as 'assessment'",
+      "Step 10: Verify enrollment columns categorized as 'enrollment'"
     ],
     "passes": false
   },
