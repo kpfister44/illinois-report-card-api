@@ -72,7 +72,7 @@
       "Step 9: Send another request and verify it succeeds with 200",
       "Step 10: Verify usage_logs contains all request attempts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

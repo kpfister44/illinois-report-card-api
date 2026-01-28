@@ -2,7 +2,7 @@
 # ABOUTME: Provides database sessions, auth validation, and common dependencies
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import Header, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
 from typing import Annotated
@@ -52,6 +52,43 @@ async def verify_api_key(
         raise HTTPException(
             status_code=401,
             detail={"code": "INVALID_API_KEY", "message": "API key is missing or invalid"}
+        )
+
+    # Check rate limiting
+    rate_limits = {
+        "free": 100,
+        "standard": 1000,
+        "premium": 10000
+    }
+    rate_limit = rate_limits.get(api_key.rate_limit_tier, 100)
+    window_seconds = 60  # 1 minute window
+
+    # Count requests in the current window
+    window_start = datetime.utcnow() - timedelta(seconds=window_seconds)
+    recent_requests = db.query(UsageLog).filter(
+        UsageLog.api_key_id == api_key.id,
+        UsageLog.timestamp >= window_start
+    ).count()
+
+    if recent_requests >= rate_limit:
+        # Log the rate-limited request
+        usage_log = UsageLog(
+            api_key_id=api_key.id,
+            endpoint=request.url.path,
+            method=request.method,
+            status_code=429,
+            ip_address=request.client.host if request.client else None
+        )
+        db.add(usage_log)
+        db.commit()
+
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "RATE_LIMITED",
+                "message": f"Rate limit exceeded. Retry after {window_seconds} seconds.",
+                "retry_after": window_seconds
+            }
         )
 
     # Update last_used_at
