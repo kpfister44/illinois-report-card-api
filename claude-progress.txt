@@ -516,3 +516,99 @@ Continue with Phase 2 (Data Import Pipeline):
 - Next session should focus on Phase 2 import functionality
 - All tests remain passing
 - Following TDD strictly throughout
+
+---
+
+# Claude Progress - Session 5 (Coding Agent)
+
+## Date: 2026-01-28
+
+## Summary
+Completed Test #15 (Schema detection) - implemented comprehensive column type and category detection with end-to-end integration testing.
+
+## Session Start: Verification Tests
+- Ran full test suite: All 17 tests passing
+- Manual verification: Health endpoint and authentication working correctly
+- No regressions found
+- Server running on port 8000
+
+## Completed Tasks
+
+### Test #15: Schema Detection Implementation
+Following TDD methodology:
+
+1. **Wrote failing unit tests** (tests/test_utils/test_schema_detector.py)
+   - 10 comprehensive tests for type and category detection
+   - Tests for integer, float, percentage, string detection
+   - Tests for demographics, assessment, enrollment, attendance, graduation categories
+
+2. **Implemented minimum code to pass tests** (app/utils/schema_detector.py):
+   - detect_column_type(column_name, values) function
+     - Detects percentage based on column name indicators (pct, percent, rate)
+     - Detects integer vs float based on actual data values
+     - Defaults to string for text data
+   - detect_column_category(column_name) function
+     - Demographics: race/ethnicity, economic status, IEP, ELL
+     - Assessment: ACT, SAT, IAR, proficiency scores
+     - Enrollment: student counts
+     - Attendance: attendance rates, truancy
+     - Graduation: graduation rates, dropout rates
+     - Other: default for unknown columns
+
+3. **Created integration test** (tests/test_integration/test_schema_detection.py):
+   - Validates all 10 steps of test #15 requirements
+   - Creates Excel file with varied column types and categories
+   - Parses file and detects schema
+   - Populates schema_metadata table
+   - Verifies correct data types: integer, float, percentage, string
+   - Verifies correct categories: demographics, assessment, enrollment, etc.
+   - Validates source_column_name preservation
+
+## Current Status
+- **15 tests passing** (28 total tests)
+  - 17 existing tests
+  - 10 new schema detector unit tests
+  - 1 new integration test
+- **62 tests remaining** (77 total in feature_list.json)
+- Schema detection infrastructure complete and tested
+
+## Git Commit
+- Commit: b7ed2a9
+- Message: "feat(import): implement schema detection with column type and category identification - test #15 passing"
+- Files: 5 changed, 390 insertions(+), 1 deletion(-)
+
+## Next Steps for Next Session
+
+Continue with Phase 2 (Data Import Pipeline) - CLI Import Command:
+
+1. **Test #16: Year-partitioned tables** (6 steps)
+   - Create schools_YYYY tables dynamically
+   - Handle different schemas per year
+   - Verify tables coexist independently
+
+2. **Test #17: CLI import command** (6 steps)
+   - Build app/cli/import_data.py
+   - Implement basic import functionality
+   - Use schema detector to create tables
+   - Populate schema_metadata
+   - Update entities_master
+
+3. **Test #18: CLI --dry-run** (5 steps)
+   - Preview import without database changes
+   - Show what would be imported
+
+4. **Test #19: CLI --list-years** (3 steps)
+   - Show available years in database
+
+5. **Test #20: CLI --detect-schema** (7 steps)
+   - Explicit schema detection flag
+   - Full schema metadata population
+
+After CLI import is working, move to API endpoints that depend on imported data (tests #21+).
+
+## Notes
+- Completed 1 test this session (test #15)
+- Following TDD strictly with both unit and integration tests
+- Schema detection is foundational for all import functionality
+- All tests remain passing
+- Ready to build CLI import command in next session
