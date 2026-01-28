@@ -614,6 +614,101 @@ After CLI import is working, move to API endpoints that depend on imported data 
 - All tests remain passing
 - Ready to build CLI import command in next session
 
+---
+
+# Claude Progress - Session 6 (Coding Agent)
+
+## Date: 2026-01-28
+
+## Summary
+Completed Test #17 (CLI import command) - implemented full data import pipeline with schema detection, table creation, and database population.
+
+## Session Start: Verification Tests
+- Ran full test suite: All 33 tests passing
+- Verified health endpoint and authentication working correctly
+- No regressions found
+- Server running on port 8000
+
+## Completed Tasks
+
+### Test #17: CLI Import Command Implementation
+Following TDD methodology:
+
+1. **Wrote failing integration test** (tests/test_integration/test_cli_import.py)
+   - Creates test Excel file with 3 schools, 9 columns
+   - Runs CLI command via subprocess with test database
+   - Validates all 6 steps of test #17 requirements
+
+2. **Implemented minimum code to pass test**:
+   - Created app/cli/import_data.py with import_excel_file() function
+     - Parses Excel file using existing excel_parser
+     - Detects schema with enhanced schema_detector (now handles string numeric values)
+     - Creates year-partitioned table via table_manager
+     - Cleans and inserts data using data_cleaners
+     - Updates entities_master with school info
+     - Populates schema_metadata with column documentation
+   - Created app/cli/__main__.py for module execution
+   - Enhanced schema_detector to detect integers in string format ("425", "1,250")
+   - Added CLI argument parsing (--year, --dry-run, --detect-schema)
+
+3. **Test validates:**
+   - CLI command executes successfully
+   - schools_2025 table created with correct schema
+   - 3 rows imported with cleaned data (commas removed, types correct)
+   - schema_metadata populated with 9 columns
+   - Data types correctly detected (integer, percentage, string)
+   - entities_master updated with 3 schools
+
+## Current Status
+- **17 feature tests passing** (86 total feature tests in feature_list.json)
+- **69 feature tests remaining**
+- **34 pytest tests passing** (all unit and integration tests)
+  - 10 API tests
+  - 1 rate limiting test
+  - 3 integration tests (schema detection, year tables, CLI import)
+  - 4 table manager service tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests (enhanced with string numeric detection)
+- CLI import functionality complete and tested
+
+## Git Commit
+- Pending: "feat(cli): implement data import command with schema detection and cleaning - test #17 passing"
+
+## Next Steps for Next Session
+
+Continue with remaining CLI tests (#18-20):
+
+1. **Test #18: CLI --dry-run** (5 steps)
+   - Preview import without database changes
+   - Show what would be imported
+
+2. **Test #19: CLI --list-years** (3 steps)
+   - Show available years in database
+
+3. **Test #20: CLI --detect-schema** (7 steps)
+   - Explicit schema detection flag
+   - Full schema metadata population
+
+After CLI tests complete, move to API endpoints that use imported data (tests #21+):
+- GET /years
+- GET /schema/{year}
+- GET /schools/{year}
+- etc.
+
+## Technical Notes
+- Enhanced schema_detector.detect_column_type() to handle string numeric values
+- Now detects integers like "425" and "1,250" correctly
+- Detects floats in strings
+- Falls back to string type for non-numeric values
+- Schema detection critical for proper table creation and data type mapping
+
+## Notes
+- Completed 1 test this session (test #17)
+- Following TDD strictly throughout
+- All tests remain passing
+- CLI import is foundational for all data-dependent API endpoints
+
 ### Test #16: Year-Partitioned Tables Implementation
 Following TDD methodology:
 

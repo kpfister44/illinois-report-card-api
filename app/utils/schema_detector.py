@@ -24,12 +24,49 @@ def detect_column_type(column_name: str, values: list) -> str:
     if not non_null_values:
         return "string"  # Default for empty columns
 
-    # Check if all non-null values are integers
-    if all(isinstance(v, int) and not isinstance(v, bool) for v in non_null_values):
+    # Check if all non-null values are integers (or strings that represent integers)
+    all_integers = True
+    all_floats = True
+
+    for v in non_null_values:
+        if isinstance(v, bool):
+            all_integers = False
+            all_floats = False
+            break
+
+        if isinstance(v, int):
+            continue
+
+        if isinstance(v, float):
+            all_integers = False
+            continue
+
+        if isinstance(v, str):
+            # Try to parse as integer (after removing commas)
+            clean_v = v.replace(',', '').strip()
+            try:
+                int(clean_v)
+                continue
+            except ValueError:
+                pass
+
+            # Try to parse as float
+            try:
+                float(clean_v)
+                all_integers = False
+                continue
+            except ValueError:
+                pass
+
+        # Value is not numeric
+        all_integers = False
+        all_floats = False
+        break
+
+    if all_integers:
         return "integer"
 
-    # Check if all non-null values are numeric (int or float)
-    if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in non_null_values):
+    if all_floats:
         return "float"
 
     # Default to string

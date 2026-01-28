@@ -206,7 +206,7 @@
       "Step 5: Verify schema_metadata contains column info",
       "Step 6: Verify entities_master updated"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
