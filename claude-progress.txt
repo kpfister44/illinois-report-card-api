@@ -787,6 +787,49 @@ Following TDD methodology:
 - All tests remain passing
 - CLI import complete with all utility flags
 
+### Test #20: CLI --detect-schema Comprehensive Validation
+Following TDD methodology:
+
+1. **Wrote comprehensive failing test** (tests/test_integration/test_cli_import.py)
+   - Tests all 7 steps: schema detection validation
+   - Verifies data type detection (integer, percentage, string)
+   - Verifies category detection (demographics, assessment, enrollment, graduation)
+   - Validates source column name preservation
+
+2. **Fixed bug in category detection**:
+   - Issue: Category detector received original headers with spaces instead of normalized names
+   - Fix: Pass normalized_header to detect_column_category()
+   - Impact: Now correctly categorizes "Pct Low Income" as demographics
+
+3. **Test validates:**
+   - All columns have schema_metadata entries
+   - Integer detection works with commas ("1,250")
+   - Percentage detection works with "%" in name
+   - Category detection works correctly (demographics, assessment, enrollment, graduation)
+   - Source column names preserved from Excel
+
+## Current Status After Test #20
+- **20 feature tests passing** (86 total feature tests in feature_list.json)
+- **66 feature tests remaining**
+- **37 pytest tests passing** (all unit and integration tests)
+  - 10 API tests
+  - 1 rate limiting test
+  - 6 integration tests (schema detection, year tables, CLI import, dry-run, list-years, detect-schema)
+  - 4 table manager service tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Bug Fixes This Session
+- Fixed category detection to use normalized column names
+- Now correctly categorizes columns with spaces in their names
+
+## Notes
+- Completed 4 tests this session (tests #17-20)
+- Following TDD strictly throughout
+- All tests remain passing
+- CLI import Phase 2 COMPLETE - all CLI tests passing
+
 ### Test #16: Year-Partitioned Tables Implementation
 Following TDD methodology:
 

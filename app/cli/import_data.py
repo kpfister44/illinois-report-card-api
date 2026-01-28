@@ -78,7 +78,7 @@ def import_excel_file(file_path: str, year: int, dry_run: bool = False, detect_s
         # Get sample values for type detection from row dicts
         sample_values = [row.get(header) for row in rows if row.get(header) is not None]
         data_type = detect_column_type(header, sample_values) if detect_schema else "string"
-        category = detect_column_category(header) if detect_schema else "other"
+        category = detect_column_category(normalized_header) if detect_schema else "other"
 
         # Store metadata for later use
         schema_metadata[normalized_header] = {

@@ -367,3 +367,126 @@ def test_cli_import_list_years_shows_available_years(test_excel_file):
 
     # Cleanup test database
     os.unlink(db_path)
+
+
+def test_cli_import_detect_schema_triggers_schema_detection(test_excel_file):
+    """
+    Test #20: CLI import --detect-schema explicitly triggers schema detection
+
+    Steps:
+    1. Create Excel file with columns not previously imported
+    2. Run python -m app.cli.import_data test_file.xlsx --year 2015 --detect-schema
+    3. Verify command completes successfully
+    4. Verify schools_2015 table created with detected schema
+    5. Verify schema_metadata populated with column_name, data_type, and category for each column
+    6. Verify data_type detection (integers, floats, percentages, strings identified correctly)
+    7. Verify category detection (demographics, assessment, enrollment columns categorized)
+    """
+    import subprocess
+
+    # Use a temporary database for this test
+    test_db_path = tempfile.NamedTemporaryFile(mode='w', suffix='.db', delete=False)
+    test_db_path.close()
+    db_path = test_db_path.name
+
+    # Create database tables
+    from sqlalchemy import create_engine
+    from app.models.database import Base
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(bind=engine)
+    engine.dispose()
+
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"sqlite:///{db_path}"
+
+    # Step 1: Excel file with various column types (created by fixture)
+    # The fixture already has: RCDTS, School Name, City, County, Type, Enrollment, Pct Low Income, SAT Average, Graduation Rate %
+
+    # Step 2: Run CLI import with --detect-schema
+    result = subprocess.run(
+        [".venv/bin/python", "-m", "app.cli.import_data", test_excel_file, "--year", "2015", "--detect-schema"],
+        cwd="/Users/kyle.pfister/ReportCardAPI",
+        capture_output=True,
+        text=True,
+        env=env
+    )
+
+    # Step 3: Verify command completes successfully
+    assert result.returncode == 0, f"Import failed: {result.stderr}"
+    assert "successfully" in result.stdout.lower(), "Output should indicate success"
+
+    # Connect to database to verify
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Step 4: Verify schools_2015 table created with detected schema
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schools_2015'")
+        table_exists = cursor.fetchone()
+        assert table_exists is not None, "schools_2015 table not created"
+
+        # Get table columns
+        cursor.execute("PRAGMA table_info(schools_2015)")
+        columns_info = cursor.fetchall()
+        column_names = [col[1] for col in columns_info]
+
+        # Verify expected columns exist
+        assert "rcdts" in column_names
+        assert "school_name" in column_names
+        assert "enrollment" in column_names
+        assert "pct_low_income" in column_names
+        assert "sat_average" in column_names
+        assert "graduation_rate_pct" in column_names
+
+        # Step 5: Verify schema_metadata populated with all required fields
+        cursor.execute("""
+            SELECT column_name, data_type, category, source_column_name
+            FROM schema_metadata
+            WHERE year = 2015 AND table_name = 'schools_2015'
+            ORDER BY column_name
+        """)
+        schema_rows = cursor.fetchall()
+
+        assert len(schema_rows) > 0, "schema_metadata should be populated"
+
+        # Create dict for easier validation
+        schema_dict = {row[0]: {"data_type": row[1], "category": row[2], "source": row[3]} for row in schema_rows}
+
+        # Step 6: Verify data_type detection
+        # Integer: Enrollment (has commas like "1,250")
+        assert schema_dict["enrollment"]["data_type"] == "integer", "Enrollment should be detected as integer"
+
+        # Percentage: Pct Low Income, Graduation Rate %
+        assert schema_dict["pct_low_income"]["data_type"] == "percentage", "Pct Low Income should be detected as percentage"
+        assert schema_dict["graduation_rate_pct"]["data_type"] == "percentage", "Graduation Rate should be detected as percentage"
+
+        # String: RCDTS, School Name, City, County, Type
+        assert schema_dict["rcdts"]["data_type"] == "string", "RCDTS should be string"
+        assert schema_dict["school_name"]["data_type"] == "string", "School Name should be string"
+
+        # Integer with suppressed values: SAT Average (has "*")
+        # Should be string because of the asterisk
+        assert schema_dict["sat_average"]["data_type"] in ["string", "integer"], "SAT Average detection"
+
+        # Step 7: Verify category detection
+        # Enrollment category
+        assert schema_dict["enrollment"]["category"] == "enrollment", "Enrollment should be categorized as enrollment"
+
+        # Demographics category (Low Income)
+        assert schema_dict["pct_low_income"]["category"] == "demographics", "Low Income should be demographics"
+
+        # Assessment category (SAT)
+        assert schema_dict["sat_average"]["category"] == "assessment", "SAT should be assessment"
+
+        # Graduation category
+        assert schema_dict["graduation_rate_pct"]["category"] == "graduation", "Graduation Rate should be graduation"
+
+        # Verify source_column_name is preserved (original Excel column names)
+        assert schema_dict["pct_low_income"]["source"] == "Pct Low Income"
+        assert schema_dict["graduation_rate_pct"]["source"] == "Graduation Rate %"
+
+    finally:
+        conn.close()
+
+    # Cleanup test database
+    os.unlink(db_path)

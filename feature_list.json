@@ -242,7 +242,7 @@
       "Step 6: Verify data_type detection (integers, floats, percentages, strings identified correctly)",
       "Step 7: Verify category detection (demographics, assessment, enrollment columns categorized)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
