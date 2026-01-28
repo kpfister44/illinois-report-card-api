@@ -565,11 +565,12 @@ Following TDD methodology:
    - Validates source_column_name preservation
 
 ## Current Status
-- **15 tests passing** (28 total tests)
+- **15 feature tests passing** (86 total feature tests in feature_list.json)
+- **71 feature tests remaining**
+- **28 pytest tests passing** (all unit and integration tests)
   - 17 existing tests
   - 10 new schema detector unit tests
   - 1 new integration test
-- **62 tests remaining** (77 total in feature_list.json)
 - Schema detection infrastructure complete and tested
 
 ## Git Commit
