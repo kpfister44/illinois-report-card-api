@@ -42,3 +42,31 @@ class UsageLog(Base):
     ip_address = Column(String(45))
 
     api_key = relationship("APIKey", back_populates="usage_logs")
+
+
+class EntitiesMaster(Base):
+    """Master table of stable entity identifiers (schools, districts, state)."""
+    __tablename__ = "entities_master"
+
+    id = Column(Integer, primary_key=True)
+    rcdts = Column(Text, unique=True, nullable=False, index=True)
+    entity_type = Column(Text, nullable=False, index=True)  # school | district | state | region
+    name = Column(Text)
+    city = Column(Text)
+    county = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SchemaMetadata(Base):
+    """Metadata about columns in year-partitioned tables."""
+    __tablename__ = "schema_metadata"
+
+    id = Column(Integer, primary_key=True)
+    year = Column(Integer, nullable=False, index=True)
+    table_name = Column(Text, nullable=False)  # schools_2025, districts_2025, etc.
+    column_name = Column(Text, nullable=False)
+    data_type = Column(Text)  # string | integer | float | percentage
+    category = Column(Text, index=True)  # demographics | assessment | enrollment | attendance | etc.
+    description = Column(Text)
+    source_column_name = Column(Text)  # Original Excel column name
+    is_suppressed_indicator = Column(Boolean, default=False)  # Marks columns that use * for privacy
