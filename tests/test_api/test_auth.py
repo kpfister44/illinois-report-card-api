@@ -102,3 +102,26 @@ def test_invalid_api_key_returns_401(client):
     data = response.json()
     assert data["code"] == "INVALID_API_KEY"
     assert "API key is missing or invalid" in data["message"]
+
+
+def test_revoked_api_key_returns_401(client):
+    """Request with revoked API key (is_active=False) should return 401."""
+    # Create a revoked API key in the database
+    from tests.conftest import TestingSessionLocal
+    db = TestingSessionLocal()
+    try:
+        api_key = create_test_api_key(db, key="revoked_key_12345", is_active=False)
+        revoked_key_str = "revoked_key_12345"
+    finally:
+        db.close()
+
+    # Send request with revoked API key
+    response = client.get("/years", headers={"Authorization": f"Bearer {revoked_key_str}"})
+
+    # Verify response status code is 401
+    assert response.status_code == 401
+
+    # Verify error response indicates invalid API key
+    data = response.json()
+    assert data["code"] == "INVALID_API_KEY"
+    assert "API key is missing or invalid" in data["message"]
