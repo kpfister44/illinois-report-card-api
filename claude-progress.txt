@@ -709,6 +709,45 @@ After CLI tests complete, move to API endpoints that use imported data (tests #2
 - All tests remain passing
 - CLI import is foundational for all data-dependent API endpoints
 
+### Test #18: CLI --dry-run Implementation
+
+1. **Wrote comprehensive test** (tests/test_integration/test_cli_import.py)
+   - Records database state before dry-run
+   - Runs CLI with --dry-run flag
+   - Validates output shows preview
+   - Confirms no database changes made
+
+2. **Test passed immediately**:
+   - --dry-run functionality was already implemented in Test #17
+   - Test validates existing behavior works correctly
+   - No code changes needed
+
+3. **Test validates:**
+   - Output shows "Dry run - no database changes will be made"
+   - Output shows table name and row count that would be imported
+   - No tables created in dry-run mode
+   - No data inserted in dry-run mode
+   - schema_metadata not populated
+   - entities_master not populated
+
+## Current Status After Test #18
+- **18 feature tests passing** (86 total feature tests in feature_list.json)
+- **68 feature tests remaining**
+- **35 pytest tests passing** (all unit and integration tests)
+  - 10 API tests
+  - 1 rate limiting test
+  - 4 integration tests (schema detection, year tables, CLI import, CLI dry-run)
+  - 4 table manager service tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Notes
+- Completed 2 tests this session (tests #17-18)
+- Following TDD strictly throughout
+- All tests remain passing
+- CLI import fully functional with dry-run preview capability
+
 ### Test #16: Year-Partitioned Tables Implementation
 Following TDD methodology:
 

@@ -206,3 +206,98 @@ def test_cli_import_processes_excel_file_correctly(test_excel_file):
 
     # Cleanup test database
     os.unlink(db_path)
+
+
+def test_cli_import_dry_run_previews_without_modifying_database(test_excel_file):
+    """
+    Test #18: CLI import --dry-run previews without modifying database
+
+    Steps:
+    1. Record current database state
+    2. Run python -m app.cli.import_data test_file.xlsx --year 2025 --dry-run
+    3. Verify output shows what would be imported
+    4. Verify no actual database changes made
+    5. Verify schools_2025 table not created or unchanged
+    """
+    import subprocess
+
+    # Use a temporary database for this test
+    test_db_path = tempfile.NamedTemporaryFile(mode='w', suffix='.db', delete=False)
+    test_db_path.close()
+    db_path = test_db_path.name
+
+    # Create database tables
+    from sqlalchemy import create_engine
+    from app.models.database import Base
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(bind=engine)
+    engine.dispose()
+
+    # Step 1: Record current database state
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get list of tables before dry-run
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tables_before = {row[0] for row in cursor.fetchall()}
+
+    # Get row counts for existing tables
+    table_counts_before = {}
+    for table in tables_before:
+        cursor.execute(f"SELECT COUNT(*) FROM {table}")
+        table_counts_before[table] = cursor.fetchone()[0]
+
+    conn.close()
+
+    # Step 2: Run CLI import command with --dry-run
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"sqlite:///{db_path}"
+
+    result = subprocess.run(
+        [".venv/bin/python", "-m", "app.cli.import_data", test_excel_file, "--year", "2025", "--dry-run"],
+        cwd="/Users/kyle.pfister/ReportCardAPI",
+        capture_output=True,
+        text=True,
+        env=env
+    )
+
+    # Step 3: Verify output shows what would be imported
+    assert result.returncode == 0, f"Dry run failed: {result.stderr}"
+    output = result.stdout.lower()
+    assert "dry run" in output, "Output should indicate this is a dry run"
+    assert "would create" in output or "would import" in output, "Output should show what would be done"
+    assert "schools_2025" in output, "Output should mention the table that would be created"
+    assert "3" in result.stdout, "Output should show number of rows that would be imported"
+
+    # Step 4 & 5: Verify no actual database changes made
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get list of tables after dry-run
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tables_after = {row[0] for row in cursor.fetchall()}
+
+    # Verify no new tables created
+    assert tables_before == tables_after, "Dry run should not create any new tables"
+    assert "schools_2025" not in tables_after, "schools_2025 table should not be created in dry-run mode"
+
+    # Verify row counts unchanged
+    for table in tables_before:
+        cursor.execute(f"SELECT COUNT(*) FROM {table}")
+        count_after = cursor.fetchone()[0]
+        assert table_counts_before[table] == count_after, f"Row count for {table} should not change in dry-run mode"
+
+    # Verify schema_metadata was not populated
+    cursor.execute("SELECT COUNT(*) FROM schema_metadata WHERE year = 2025")
+    schema_count = cursor.fetchone()[0]
+    assert schema_count == 0, "schema_metadata should not be populated in dry-run mode"
+
+    # Verify entities_master was not populated
+    cursor.execute("SELECT COUNT(*) FROM entities_master")
+    entity_count = cursor.fetchone()[0]
+    assert entity_count == 0, "entities_master should not be populated in dry-run mode"
+
+    conn.close()
+
+    # Cleanup test database
+    os.unlink(db_path)

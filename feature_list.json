@@ -218,7 +218,7 @@
       "Step 4: Verify no actual database changes made",
       "Step 5: Verify schools_2025 table not created or unchanged"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
