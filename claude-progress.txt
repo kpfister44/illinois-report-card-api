@@ -180,20 +180,51 @@ Fixed build configuration issue and verified health endpoint functionality.
 - Commit: a553be5
 
 ## Current State
-- 1 test passing out of 77 total tests
-- 76 tests remaining
+- 2 tests passing out of 77 total tests
+- 75 tests remaining
 - Development environment fully functional
 - FastAPI server running and responding correctly
 
+### 3. Implemented Authentication and Protected Endpoints (Test #2)
+Following TDD methodology:
+1. **Wrote failing tests** (tests/test_api/test_auth.py)
+   - test_unauthenticated_request_to_years_returns_401
+   - test_unauthenticated_request_to_schools_returns_401
+   - test_unauthenticated_request_to_search_returns_401
+
+2. **Implemented minimum code to pass tests**:
+   - Created verify_api_key dependency (app/dependencies.py)
+   - Checks for "Authorization: Bearer <key>" header
+   - Returns 401 with INVALID_API_KEY if missing/malformed
+   - Created custom HTTPException handler (app/main.py)
+   - Formats error responses as {"code": "...", "message": "..."}
+   - Implemented stub endpoints:
+     - GET /years (app/api/years.py)
+     - GET /schools/{year} (app/api/schools.py)
+     - GET /search (app/api/search.py)
+   - All endpoints require authentication via Depends(verify_api_key)
+
+3. **Verified end-to-end**:
+   - All pytest tests passing
+   - Manual curl tests confirm correct 401 responses
+   - Updated feature_list.json: marked test #2 as passing
+
+- Commit: 94300dc
+
 ## Next Steps
-The next session should focus on implementing authentication infrastructure (Tests #2-6):
-1. Create database models (entities_master, api_keys, schema_metadata, usage_logs)
-2. Set up SQLite database connection
-3. Implement API key authentication middleware
-4. Write tests for authentication flow
-5. Implement /years endpoint (Test #7)
+The next session should continue with authentication infrastructure (Tests #3-6):
+1. Create database models (api_keys, schema_metadata, usage_logs, entities_master)
+2. Set up SQLite database connection with SQLAlchemy
+3. Enhance verify_api_key to validate against database
+4. Implement Test #3: Valid API key authentication (requires DB lookup, last_used_at update, usage logging)
+5. Implement Test #4: Invalid API key returns 401 (DB validation)
+6. Implement Test #5: Revoked API key returns 401 (is_active check)
+7. Implement Test #6: Rate limiting (complex - 10 steps)
+
+Note: Tests #3-6 all require database infrastructure, so next session should start with database setup.
 
 ## Notes
-- The health endpoint was already implemented in Session 1 but not marked as passing
-- Build fix was required before any tests could run
+- Following TDD strictly: write failing test, implement minimum code, refactor
+- Authentication infrastructure is partially complete - currently checks for header format but doesn't validate against database
+- Stub endpoints return empty data - will be implemented when database is ready
 - Server is running on http://localhost:8000
