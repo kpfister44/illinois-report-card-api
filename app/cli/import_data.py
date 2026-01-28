@@ -169,16 +169,63 @@ def import_excel_file(file_path: str, year: int, dry_run: bool = False, detect_s
         engine.dispose()
 
 
+def list_available_years() -> None:
+    """List all years that have been imported into the database."""
+    from sqlalchemy import inspect
+
+    settings = get_settings()
+    engine = create_engine(settings.database_url)
+
+    try:
+        # Query database for all year-partitioned tables
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+
+        # Extract years from table names (format: schools_YYYY, districts_YYYY)
+        years = set()
+        for table_name in table_names:
+            if '_' in table_name:
+                parts = table_name.split('_')
+                if len(parts) == 2:
+                    try:
+                        year = int(parts[1])
+                        years.add(year)
+                    except ValueError:
+                        continue
+
+        if not years:
+            print("No data has been imported yet.")
+        else:
+            print("Available years in database:")
+            for year in sorted(years):
+                print(f"  - {year}")
+
+    finally:
+        engine.dispose()
+
+
 def main():
     """CLI entry point for import command."""
     parser = argparse.ArgumentParser(description="Import Illinois Report Card data")
-    parser.add_argument("file_path", help="Path to Excel file")
-    parser.add_argument("--year", type=int, required=True, help="Year for data")
+    parser.add_argument("file_path", nargs='?', help="Path to Excel file")
+    parser.add_argument("--year", type=int, help="Year for data")
     parser.add_argument("--dry-run", action="store_true", help="Preview without importing")
     parser.add_argument("--detect-schema", action="store_true", default=True,
                         help="Auto-detect column types and categories")
+    parser.add_argument("--list-years", action="store_true", help="List available years in database")
 
     args = parser.parse_args()
+
+    # Handle --list-years flag
+    if args.list_years:
+        list_available_years()
+        return
+
+    # For import operations, file_path and year are required
+    if not args.file_path:
+        parser.error("file_path is required for import operations")
+    if not args.year:
+        parser.error("--year is required for import operations")
 
     # Validate file exists
     file_path = Path(args.file_path)

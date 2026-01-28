@@ -301,3 +301,69 @@ def test_cli_import_dry_run_previews_without_modifying_database(test_excel_file)
 
     # Cleanup test database
     os.unlink(db_path)
+
+
+def test_cli_import_list_years_shows_available_years(test_excel_file):
+    """
+    Test #19: CLI import --list-years shows available years
+
+    Steps:
+    1. Import data for 2024 and 2025
+    2. Run python -m app.cli.import_data --list-years
+    3. Verify output shows 2024 and 2025
+    """
+    import subprocess
+
+    # Use a temporary database for this test
+    test_db_path = tempfile.NamedTemporaryFile(mode='w', suffix='.db', delete=False)
+    test_db_path.close()
+    db_path = test_db_path.name
+
+    # Create database tables
+    from sqlalchemy import create_engine
+    from app.models.database import Base
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(bind=engine)
+    engine.dispose()
+
+    env = os.environ.copy()
+    env["DATABASE_URL"] = f"sqlite:///{db_path}"
+
+    # Step 1: Import data for 2024 and 2025
+    result_2024 = subprocess.run(
+        [".venv/bin/python", "-m", "app.cli.import_data", test_excel_file, "--year", "2024"],
+        cwd="/Users/kyle.pfister/ReportCardAPI",
+        capture_output=True,
+        text=True,
+        env=env
+    )
+    assert result_2024.returncode == 0, f"2024 import failed: {result_2024.stderr}"
+
+    result_2025 = subprocess.run(
+        [".venv/bin/python", "-m", "app.cli.import_data", test_excel_file, "--year", "2025"],
+        cwd="/Users/kyle.pfister/ReportCardAPI",
+        capture_output=True,
+        text=True,
+        env=env
+    )
+    assert result_2025.returncode == 0, f"2025 import failed: {result_2025.stderr}"
+
+    # Step 2: Run --list-years
+    result = subprocess.run(
+        [".venv/bin/python", "-m", "app.cli.import_data", "--list-years"],
+        cwd="/Users/kyle.pfister/ReportCardAPI",
+        capture_output=True,
+        text=True,
+        env=env
+    )
+
+    # Step 3: Verify output shows 2024 and 2025
+    assert result.returncode == 0, f"--list-years failed: {result.stderr}"
+    output = result.stdout
+
+    assert "2024" in output, "Output should contain 2024"
+    assert "2025" in output, "Output should contain 2025"
+    assert "available years" in output.lower() or "years" in output.lower(), "Output should mention years"
+
+    # Cleanup test database
+    os.unlink(db_path)

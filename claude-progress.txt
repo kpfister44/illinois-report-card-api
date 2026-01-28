@@ -748,6 +748,45 @@ After CLI tests complete, move to API endpoints that use imported data (tests #2
 - All tests remain passing
 - CLI import fully functional with dry-run preview capability
 
+### Test #19: CLI --list-years Implementation
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_integration/test_cli_import.py)
+   - Imports data for 2024 and 2025
+   - Runs CLI with --list-years flag
+   - Validates output shows both years
+
+2. **Implemented minimum code to pass test**:
+   - Added list_available_years() function
+     - Queries database for year-partitioned tables (schools_YYYY, districts_YYYY)
+     - Extracts years from table names
+     - Prints formatted list of available years
+   - Updated argument parser to support --list-years flag
+   - Made file_path and --year optional when using --list-years
+
+3. **Test validates:**
+   - Command runs without file_path or --year arguments
+   - Output contains "Available years" message
+   - Output lists 2024 and 2025
+
+## Current Status After Test #19
+- **19 feature tests passing** (86 total feature tests in feature_list.json)
+- **67 feature tests remaining**
+- **36 pytest tests passing** (all unit and integration tests)
+  - 10 API tests
+  - 1 rate limiting test
+  - 5 integration tests (schema detection, year tables, CLI import, CLI dry-run, CLI list-years)
+  - 4 table manager service tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Notes
+- Completed 3 tests this session (tests #17-19)
+- Following TDD strictly throughout
+- All tests remain passing
+- CLI import complete with all utility flags
+
 ### Test #16: Year-Partitioned Tables Implementation
 Following TDD methodology:
 

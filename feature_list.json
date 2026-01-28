@@ -228,7 +228,7 @@
       "Step 2: Run python -m app.cli.import_data --list-years",
       "Step 3: Verify output shows 2024 and 2025"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
