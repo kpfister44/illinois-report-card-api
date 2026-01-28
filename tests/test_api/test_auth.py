@@ -88,3 +88,17 @@ def test_valid_api_key_allows_access(client):
         assert usage_log.status_code == 200
     finally:
         db2.close()
+
+
+def test_invalid_api_key_returns_401(client):
+    """Request with invalid API key should return 401."""
+    # Send request with invalid API key (not in database)
+    response = client.get("/years", headers={"Authorization": "Bearer invalid_key_12345"})
+
+    # Verify response status code is 401
+    assert response.status_code == 401
+
+    # Verify error response structure
+    data = response.json()
+    assert data["code"] == "INVALID_API_KEY"
+    assert "API key is missing or invalid" in data["message"]

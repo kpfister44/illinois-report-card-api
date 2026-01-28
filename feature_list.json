@@ -44,7 +44,7 @@
       "Step 3: Verify error response has code INVALID_API_KEY",
       "Step 4: Verify error message indicates key is missing or invalid"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
