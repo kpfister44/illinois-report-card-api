@@ -76,6 +76,176 @@
   },
   {
     "category": "functional",
+    "description": "API key hashing prevents plaintext storage",
+    "steps": [
+      "Step 1: Create new API key via admin endpoint",
+      "Step 2: Query api_keys table directly",
+      "Step 3: Verify key_hash column contains SHA-256 hash (not plaintext)",
+      "Step 4: Verify key_prefix column contains first 8 characters",
+      "Step 5: Verify authentication works by hashing provided key and comparing"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Usage logging captures all requests accurately",
+    "steps": [
+      "Step 1: Make authenticated request to any endpoint",
+      "Step 2: Query usage_logs table",
+      "Step 3: Verify entry contains api_key_id, endpoint, method",
+      "Step 4: Verify entry contains status_code, response_time_ms, timestamp",
+      "Step 5: Verify ip_address captured"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Data import converts percentage strings to floats",
+    "steps": [
+      "Step 1: Create Excel file with percentage values like 75.5%",
+      "Step 2: Import the file",
+      "Step 3: Query the imported data",
+      "Step 4: Verify percentage stored as float 75.5 (not string)"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "Data import handles suppressed asterisk values as NULL",
+    "steps": [
+      "Step 1: Create Excel file with * values (privacy-suppressed)",
+      "Step 2: Import the file",
+      "Step 3: Query the imported data",
+      "Step 4: Verify * values are stored as NULL",
+      "Step 5: Verify is_suppressed_indicator marked in schema_metadata"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "Data import handles enrollment strings with commas",
+    "steps": [
+      "Step 1: Create Excel file with enrollment values like 1,250",
+      "Step 2: Import the file",
+      "Step 3: Query the imported data",
+      "Step 4: Verify enrollment stored as integer 1250"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "Data import normalizes column names correctly",
+    "steps": [
+      "Step 1: Create Excel file with columns like 'School Name' and 'Total Enrollment'",
+      "Step 2: Import the file",
+      "Step 3: Verify columns stored as school_name and total_enrollment",
+      "Step 4: Verify source_column_name in schema_metadata preserves original"
+    ],
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "Empty cells and blank strings are converted to NULL",
+    "steps": [
+      "Step 1: Create Excel file with empty cells and blank strings",
+      "Step 2: Import the file",
+      "Step 3: Query the imported data",
+      "Step 4: Verify empty values stored as NULL (not empty string)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Multi-sheet Excel files are processed correctly",
+    "steps": [
+      "Step 1: Create Excel file with multiple sheets (General, ACT, IAR, etc.)",
+      "Step 2: Import the file",
+      "Step 3: Verify data from all sheets is combined correctly",
+      "Step 4: Verify school records have data from all relevant sheets"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Schema detection correctly identifies column types and categories",
+    "steps": [
+      "Step 1: Create Excel file with columns of different types (integers, floats, percentages, strings)",
+      "Step 2: Include columns from different categories (demographics, assessment, enrollment)",
+      "Step 3: Import with schema detection",
+      "Step 4: Verify integer columns have data_type 'integer' in schema_metadata",
+      "Step 5: Verify float columns have data_type 'float' in schema_metadata",
+      "Step 6: Verify percentage columns (e.g., '75.5%') have data_type 'percentage' in schema_metadata",
+      "Step 7: Verify string columns have data_type 'string' in schema_metadata",
+      "Step 8: Verify demographic columns categorized as 'demographics'",
+      "Step 9: Verify assessment columns categorized as 'assessment'",
+      "Step 10: Verify enrollment columns categorized as 'enrollment'"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "Year-partitioned tables are created correctly for each year",
+    "steps": [
+      "Step 1: Import 2024 data",
+      "Step 2: Verify schools_2024 table created",
+      "Step 3: Import 2025 data with different schema",
+      "Step 4: Verify schools_2025 table created with its own schema",
+      "Step 5: Verify both tables coexist independently",
+      "Step 6: Verify schema differences are preserved (not merged)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "CLI import command processes Excel file correctly",
+    "steps": [
+      "Step 1: Create test Excel file with school data including multiple sheets",
+      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2025",
+      "Step 3: Verify command completes successfully",
+      "Step 4: Verify schools_2025 table created and populated",
+      "Step 5: Verify schema_metadata contains column info",
+      "Step 6: Verify entities_master updated"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "CLI import --dry-run previews without modifying database",
+    "steps": [
+      "Step 1: Record current database state",
+      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2025 --dry-run",
+      "Step 3: Verify output shows what would be imported",
+      "Step 4: Verify no actual database changes made",
+      "Step 5: Verify schools_2025 table not created or unchanged"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "CLI import --list-years shows available years",
+    "steps": [
+      "Step 1: Import data for 2024 and 2025",
+      "Step 2: Run python -m app.cli.import_data --list-years",
+      "Step 3: Verify output shows 2024 and 2025"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "CLI import --detect-schema explicitly triggers schema detection",
+    "steps": [
+      "Step 1: Create Excel file with columns not previously imported",
+      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2015 --detect-schema",
+      "Step 3: Verify command completes successfully",
+      "Step 4: Verify schools_2015 table created with detected schema",
+      "Step 5: Verify schema_metadata populated with column_name, data_type, and category for each column",
+      "Step 6: Verify data_type detection (integers, floats, percentages, strings identified correctly)",
+      "Step 7: Verify category detection (demographics, assessment, enrollment columns categorized)"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
     "description": "GET /years returns list of all available data years",
     "steps": [
       "Step 1: Import data for years 2024 and 2025 into the database",
@@ -222,6 +392,17 @@
   },
   {
     "category": "functional",
+    "description": "GET /schools/{year} returns 400 for invalid year",
+    "steps": [
+      "Step 1: Send authenticated GET request to /schools/2030",
+      "Step 2: Verify response status code is 400",
+      "Step 3: Verify error response has code INVALID_PARAMETER",
+      "Step 4: Verify error message indicates available years"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
     "description": "GET /schools/{year}/{rcdts} returns single school with all available fields",
     "steps": [
       "Step 1: Import a school with rcdts 05-016-2140-17-0002 and known set of columns",
@@ -254,17 +435,6 @@
       "Step 2: Verify response status code is 404",
       "Step 3: Verify error response has code NOT_FOUND",
       "Step 4: Verify error message includes the requested rcdts"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "GET /schools/{year} returns 400 for invalid year",
-    "steps": [
-      "Step 1: Send authenticated GET request to /schools/2030",
-      "Step 2: Verify response status code is 400",
-      "Step 3: Verify error response has code INVALID_PARAMETER",
-      "Step 4: Verify error message indicates available years"
     ],
     "passes": false
   },
@@ -334,6 +504,17 @@
   },
   {
     "category": "functional",
+    "description": "GET /districts/{year} returns 400 for invalid year",
+    "steps": [
+      "Step 1: Send authenticated GET request to /districts/2030",
+      "Step 2: Verify response status code is 400",
+      "Step 3: Verify error response has code INVALID_PARAMETER",
+      "Step 4: Verify error message indicates available years"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
     "description": "GET /districts/{year}/{district_id} returns single district detail",
     "steps": [
       "Step 1: Import a district with known district_id",
@@ -351,17 +532,6 @@
       "Step 1: Send authenticated GET request to /districts/2025/nonexistent-id",
       "Step 2: Verify response status code is 404",
       "Step 3: Verify error response has code NOT_FOUND"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "GET /districts/{year} returns 400 for invalid year",
-    "steps": [
-      "Step 1: Send authenticated GET request to /districts/2030",
-      "Step 2: Verify response status code is 400",
-      "Step 3: Verify error response has code INVALID_PARAMETER",
-      "Step 4: Verify error message indicates available years"
     ],
     "passes": false
   },
@@ -395,6 +565,21 @@
       "Step 2: Verify response status code is 400",
       "Step 3: Verify error response has code INVALID_PARAMETER",
       "Step 4: Verify error message indicates available years"
+    ],
+    "passes": false
+  },
+  {
+    "category": "functional",
+    "description": "FTS5 full-text search index is created and synced",
+    "steps": [
+      "Step 1: Import entities into entities_master",
+      "Step 2: Verify FTS5 virtual table exists",
+      "Step 3: Insert new entity into entities_master",
+      "Step 4: Verify FTS5 index updated via trigger",
+      "Step 5: Update entity name in entities_master",
+      "Step 6: Verify FTS5 index reflects change",
+      "Step 7: Delete entity from entities_master",
+      "Step 8: Verify FTS5 index removes entry"
     ],
     "passes": false
   },
@@ -734,140 +919,14 @@
   },
   {
     "category": "functional",
-    "description": "CLI import command processes Excel file correctly",
+    "description": "Different rate limit tiers enforce different limits",
     "steps": [
-      "Step 1: Create test Excel file with school data including multiple sheets",
-      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2025",
-      "Step 3: Verify command completes successfully",
-      "Step 4: Verify schools_2025 table created and populated",
-      "Step 5: Verify schema_metadata contains column info",
-      "Step 6: Verify entities_master updated"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "CLI import --dry-run previews without modifying database",
-    "steps": [
-      "Step 1: Record current database state",
-      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2025 --dry-run",
-      "Step 3: Verify output shows what would be imported",
-      "Step 4: Verify no actual database changes made",
-      "Step 5: Verify schools_2025 table not created or unchanged"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "CLI import --list-years shows available years",
-    "steps": [
-      "Step 1: Import data for 2024 and 2025",
-      "Step 2: Run python -m app.cli.import_data --list-years",
-      "Step 3: Verify output shows 2024 and 2025"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "CLI import --detect-schema explicitly triggers schema detection",
-    "steps": [
-      "Step 1: Create Excel file with columns not previously imported",
-      "Step 2: Run python -m app.cli.import_data test_file.xlsx --year 2015 --detect-schema",
-      "Step 3: Verify command completes successfully",
-      "Step 4: Verify schools_2015 table created with detected schema",
-      "Step 5: Verify schema_metadata populated with column_name, data_type, and category for each column",
-      "Step 6: Verify data_type detection (integers, floats, percentages, strings identified correctly)",
-      "Step 7: Verify category detection (demographics, assessment, enrollment columns categorized)"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "Data import converts percentage strings to floats",
-    "steps": [
-      "Step 1: Create Excel file with percentage values like 75.5%",
-      "Step 2: Import the file",
-      "Step 3: Query the imported data",
-      "Step 4: Verify percentage stored as float 75.5 (not string)"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Data import handles suppressed asterisk values as NULL",
-    "steps": [
-      "Step 1: Create Excel file with * values (privacy-suppressed)",
-      "Step 2: Import the file",
-      "Step 3: Query the imported data",
-      "Step 4: Verify * values are stored as NULL",
-      "Step 5: Verify is_suppressed_indicator marked in schema_metadata"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Data import handles enrollment strings with commas",
-    "steps": [
-      "Step 1: Create Excel file with enrollment values like 1,250",
-      "Step 2: Import the file",
-      "Step 3: Query the imported data",
-      "Step 4: Verify enrollment stored as integer 1250"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Data import normalizes column names correctly",
-    "steps": [
-      "Step 1: Create Excel file with columns like 'School Name' and 'Total Enrollment'",
-      "Step 2: Import the file",
-      "Step 3: Verify columns stored as school_name and total_enrollment",
-      "Step 4: Verify source_column_name in schema_metadata preserves original"
-    ],
-    "passes": true
-  },
-  {
-    "category": "functional",
-    "description": "Schema detection correctly identifies column types and categories",
-    "steps": [
-      "Step 1: Create Excel file with columns of different types (integers, floats, percentages, strings)",
-      "Step 2: Include columns from different categories (demographics, assessment, enrollment)",
-      "Step 3: Import with schema detection",
-      "Step 4: Verify integer columns have data_type 'integer' in schema_metadata",
-      "Step 5: Verify float columns have data_type 'float' in schema_metadata",
-      "Step 6: Verify percentage columns (e.g., '75.5%') have data_type 'percentage' in schema_metadata",
-      "Step 7: Verify string columns have data_type 'string' in schema_metadata",
-      "Step 8: Verify demographic columns categorized as 'demographics'",
-      "Step 9: Verify assessment columns categorized as 'assessment'",
-      "Step 10: Verify enrollment columns categorized as 'enrollment'"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "Year-partitioned tables are created correctly for each year",
-    "steps": [
-      "Step 1: Import 2024 data",
-      "Step 2: Verify schools_2024 table created",
-      "Step 3: Import 2025 data with different schema",
-      "Step 4: Verify schools_2025 table created with its own schema",
-      "Step 5: Verify both tables coexist independently",
-      "Step 6: Verify schema differences are preserved (not merged)"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "FTS5 full-text search index is created and synced",
-    "steps": [
-      "Step 1: Import entities into entities_master",
-      "Step 2: Verify FTS5 virtual table exists",
-      "Step 3: Insert new entity into entities_master",
-      "Step 4: Verify FTS5 index updated via trigger",
-      "Step 5: Update entity name in entities_master",
-      "Step 6: Verify FTS5 index reflects change",
-      "Step 7: Delete entity from entities_master",
-      "Step 8: Verify FTS5 index removes entry"
+      "Step 1: Create free tier key (100 req/min)",
+      "Step 2: Create standard tier key (1000 req/min)",
+      "Step 3: Create premium tier key (10000 req/min)",
+      "Step 4: Verify free key hits limit at 100",
+      "Step 5: Verify standard key can exceed 100 without limit",
+      "Step 6: Verify each tier enforces its specific limit"
     ],
     "passes": false
   },
@@ -892,18 +951,6 @@
       "Step 3: Trigger 403 error and verify same structure",
       "Step 4: Trigger 404 error and verify same structure",
       "Step 5: Trigger 429 error and verify same structure with retry_after"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "Usage logging captures all requests accurately",
-    "steps": [
-      "Step 1: Make authenticated request to any endpoint",
-      "Step 2: Query usage_logs table",
-      "Step 3: Verify entry contains api_key_id, endpoint, method",
-      "Step 4: Verify entry contains status_code, response_time_ms, timestamp",
-      "Step 5: Verify ip_address captured"
     ],
     "passes": false
   },
@@ -994,53 +1041,6 @@
       "Step 4: Trigger not found error",
       "Step 5: Verify error message includes the requested resource ID",
       "Step 6: Take screenshot of error response examples"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "Different rate limit tiers enforce different limits",
-    "steps": [
-      "Step 1: Create free tier key (100 req/min)",
-      "Step 2: Create standard tier key (1000 req/min)",
-      "Step 3: Create premium tier key (10000 req/min)",
-      "Step 4: Verify free key hits limit at 100",
-      "Step 5: Verify standard key can exceed 100 without limit",
-      "Step 6: Verify each tier enforces its specific limit"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "API key hashing prevents plaintext storage",
-    "steps": [
-      "Step 1: Create new API key via admin endpoint",
-      "Step 2: Query api_keys table directly",
-      "Step 3: Verify key_hash column contains SHA-256 hash (not plaintext)",
-      "Step 4: Verify key_prefix column contains first 8 characters",
-      "Step 5: Verify authentication works by hashing provided key and comparing"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "Multi-sheet Excel files are processed correctly",
-    "steps": [
-      "Step 1: Create Excel file with multiple sheets (General, ACT, IAR, etc.)",
-      "Step 2: Import the file",
-      "Step 3: Verify data from all sheets is combined correctly",
-      "Step 4: Verify school records have data from all relevant sheets"
-    ],
-    "passes": false
-  },
-  {
-    "category": "functional",
-    "description": "Empty cells and blank strings are converted to NULL",
-    "steps": [
-      "Step 1: Create Excel file with empty cells and blank strings",
-      "Step 2: Import the file",
-      "Step 3: Query the imported data",
-      "Step 4: Verify empty values stored as NULL (not empty string)"
     ],
     "passes": false
   },
