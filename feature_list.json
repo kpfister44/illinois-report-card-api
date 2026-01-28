@@ -790,7 +790,7 @@
       "Step 3: Query the imported data",
       "Step 4: Verify percentage stored as float 75.5 (not string)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -802,7 +802,7 @@
       "Step 4: Verify * values are stored as NULL",
       "Step 5: Verify is_suppressed_indicator marked in schema_metadata"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -813,7 +813,7 @@
       "Step 3: Query the imported data",
       "Step 4: Verify enrollment stored as integer 1250"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -824,7 +824,7 @@
       "Step 3: Verify columns stored as school_name and total_enrollment",
       "Step 4: Verify source_column_name in schema_metadata preserves original"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
