@@ -228,3 +228,118 @@ Note: Tests #3-6 all require database infrastructure, so next session should sta
 - Authentication infrastructure is partially complete - currently checks for header format but doesn't validate against database
 - Stub endpoints return empty data - will be implemented when database is ready
 - Server is running on http://localhost:8000
+
+---
+
+# Claude Progress - Session 3 (Coding Agent)
+
+## Date: 2026-01-27
+
+## Summary
+Completed authentication tests #4-6 (invalid keys, revoked keys, rate limiting). Identified need to implement Phase 2 (Data Import) before continuing with API endpoints.
+
+## Completed Tasks
+
+### 1. Test #4: Invalid API key returns 401
+- Added test_invalid_api_key_returns_401
+- Validates non-existent API keys return 401 with INVALID_API_KEY code
+- Implementation already handled this correctly
+- Commit: 22197f3
+
+### 2. Test #5: Revoked API key returns 401
+- Added test_revoked_api_key_returns_401
+- Validates inactive API keys (is_active=False) return 401
+- Implementation already checked is_active flag
+- Commit: 93272bd
+
+### 3. Test #6: Rate Limiting Implementation
+- Implemented sliding window rate limiting in verify_api_key
+- Supports three tiers:
+  - free: 100 requests/minute
+  - standard: 1000 requests/minute
+  - premium: 10000 requests/minute
+- Returns 429 RATE_LIMITED when limit exceeded
+- Logs rate-limited requests with status_code=429
+- Comprehensive test with 101 requests validates enforcement
+- Commit: 762d0cb
+
+## Current State
+- **6 tests passing** out of 77 total
+- 71 tests remaining
+- Authentication and rate limiting fully functional
+
+## Key Decision: Pivot to Phase 2
+While working on Test #7 (GET /years endpoint), Kyle correctly identified that we need to implement data import functionality FIRST before API endpoints can work.
+
+**Reasoning:**
+- Tests #7+ require actual data in year-partitioned tables
+- No import functionality exists yet
+- feature_list.json has 15 comprehensive tests covering Phase 2
+- Excel files available in ~/Downloads/Report-Card-Public-Data-Set.xlsx
+- Reference implementation exists at ~/IllinoisSchoolData
+
+## Next Steps: Implement Phase 2 (Data Import Pipeline)
+
+The feature_list.json tests fully cover Phase 2 requirements:
+
+**Data Cleaning & Parsing (4 tests):**
+1. Data import converts percentage strings to floats
+2. Data import handles suppressed asterisk values as NULL
+3. Data import handles enrollment strings with commas
+4. Data import normalizes column names correctly
+
+**CLI Import Command (4 tests):**
+5. CLI import command processes Excel file correctly
+6. CLI import --dry-run previews without modifying database
+7. CLI import --list-years shows available years
+8. CLI import --detect-schema explicitly triggers schema detection
+
+**Admin API Endpoints (7 tests):**
+9. Admin endpoint POST /admin/import uploads and processes Excel file
+10. Admin /admin/import requires admin API key
+11. Admin GET /admin/import/status/{id} returns import progress
+12. POST /admin/import rejects invalid file types with 400 error
+13. POST /admin/import handles corrupt Excel file gracefully
+14. GET /admin/import/status returns 404 for non-existent import_id
+15. Re-importing data for an existing year replaces previous data
+
+## Implementation Plan for Next Session
+
+Start with the core import functionality:
+
+1. **Create missing database models:**
+   - SchemaMetadata table
+   - EntitiesMaster table
+
+2. **Build Excel parser** (app/utils/excel_parser.py)
+   - Reference ~/IllinoisSchoolData/backend/app/utils/import_data.py
+   - Read Excel files, handle multiple sheets
+
+3. **Implement data cleaners** (app/utils/data_cleaners.py)
+   - clean_percentage() - "75.5%" → 75.5
+   - clean_enrollment() - "1,250" → 1250
+   - handle_suppressed() - "*" → NULL
+   - normalize_column_name() - "School Name" → "school_name"
+
+4. **Implement schema detector** (app/utils/schema_detector.py)
+   - Auto-detect column types (string, int, float, percentage)
+   - Categorize columns (demographics, assessment, enrollment, etc.)
+   - Flag suppressed indicator columns
+
+5. **Build CLI import command** (app/cli/import_data.py)
+   - Parse arguments (file path, year, --dry-run, --detect-schema)
+   - Create year-partitioned tables dynamically
+   - Import data with cleaning
+   - Populate schema_metadata
+   - Update entities_master
+
+6. **Test systematically with TDD:**
+   - Start with data cleaner tests (unit tests)
+   - Then schema detector tests
+   - Then CLI import test with sample Excel file
+   - Finally admin API endpoint tests
+
+## Resources
+- Excel file: ~/Downloads/Report-Card-Public-Data-Set.xlsx
+- Reference code: ~/IllinoisSchoolData/
+- App spec: app_spec.txt lines 481-529 (data import section)
