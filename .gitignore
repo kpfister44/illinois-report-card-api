@@ -82,3 +82,7 @@ coverage.xml
 
 # ruff
 .ruff_cache/
+
+# Data files (large Excel files - not committed)
+data/report-cards/*.xlsx
+data/report-cards/*.xls
