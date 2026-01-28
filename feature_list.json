@@ -7,7 +7,7 @@
       "Step 2: Verify response status code is 200",
       "Step 3: Verify response body contains {\"status\": \"ok\"}"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
