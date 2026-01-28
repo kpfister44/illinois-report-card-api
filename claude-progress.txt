@@ -613,3 +613,76 @@ After CLI import is working, move to API endpoints that depend on imported data 
 - Schema detection is foundational for all import functionality
 - All tests remain passing
 - Ready to build CLI import command in next session
+
+### Test #16: Year-Partitioned Tables Implementation
+Following TDD methodology:
+
+1. **Wrote failing unit tests** (tests/test_services/test_table_manager.py)
+   - 4 tests for table creation, retrieval, and existence checks
+   - Tests for multiple years with different schemas
+
+2. **Implemented minimum code to pass tests** (app/services/table_manager.py):
+   - create_year_table(year, entity_type, schema, engine)
+     - Dynamically creates SQLAlchemy tables based on schema definitions
+     - Adds id (primary key) and imported_at (timestamp) columns automatically
+     - Maps data types: integer, float, percentage (→float), string (→Text)
+   - get_year_table(year, entity_type, engine)
+     - Retrieves existing year-partitioned tables
+   - table_exists(table_name, engine)
+     - Checks if table exists in database
+
+3. **Created integration test** (tests/test_integration/test_year_partitioned_tables.py):
+   - Validates all 6 steps of test #16 requirements
+   - Creates schools_2024 with 6 columns
+   - Creates schools_2025 with 9 columns (3 additional)
+   - Inserts data into both tables
+   - Populates schema_metadata for both years
+   - Verifies tables coexist independently
+   - Verifies schema differences are preserved (2024 does NOT have 2025 columns)
+   - Verifies schema_metadata reflects per-year differences
+
+## Session Summary
+
+Completed 2 tests this session (tests #15-16):
+- Test #15: Schema detection (10 steps)
+- Test #16: Year-partitioned tables (6 steps)
+
+## Current Status After Session 5
+- **16 feature tests passing** (86 total feature tests in feature_list.json)
+- **70 feature tests remaining**
+- **33 pytest tests passing** (all unit and integration tests)
+  - 10 API tests
+  - 1 rate limiting test
+  - 2 integration tests
+  - 4 table manager service tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Git Commits This Session
+- Commit b7ed2a9: Test #15 (Schema detection)
+- Commit ce60c21: Progress notes update
+- Commit 6d16c53: Test count correction
+- Commit 268f2e4: Test #16 (Year-partitioned tables)
+
+## Next Steps for Next Session
+
+Continue building the CLI import command (tests #17-20):
+
+1. **Test #17: CLI import command** (6 steps)
+   - Build app/cli/import_data.py
+   - Implement basic import: parse Excel → detect schema → create table → insert data
+   - Update entities_master
+   - Populate schema_metadata
+
+2. **Test #18: CLI --dry-run** (5 steps)
+3. **Test #19: CLI --list-years** (3 steps)
+4. **Test #20: CLI --detect-schema** (7 steps)
+
+All foundational pieces are now in place:
+- ✓ Excel parsing
+- ✓ Data cleaning
+- ✓ Schema detection
+- ✓ Year-partitioned table creation
+
+Ready to build the CLI import orchestration in next session.
