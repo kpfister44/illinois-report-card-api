@@ -68,7 +68,7 @@ For example, if this were a chat app, you should perform a test that logs into t
 
 ### STEP 4: CHOOSE ONE FEATURE TO IMPLEMENT
 
-Look at feature_list.json and find the highest-priority feature with "passes": false.
+Look at feature_list.json and implement the next feature with "passes": false.
 
 Focus on completing one feature perfectly and completing its testing steps in this session before moving on to other features.
 It's ok if you only complete one feature in this session, as there will be more sessions later that continue to make progress.

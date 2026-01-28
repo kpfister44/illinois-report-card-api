@@ -2,6 +2,7 @@
 # ABOUTME: Provides database sessions, auth validation, and common dependencies
 
 import hashlib
+import time
 from datetime import datetime, timedelta
 from fastapi import Header, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
@@ -94,15 +95,23 @@ async def verify_api_key(
     # Update last_used_at
     api_key.last_used_at = datetime.utcnow()
 
-    # Create usage log entry
+    # Store start time for response time calculation
+    request.state.request_start_time = time.time()
+
+    # Create usage log entry (will be updated by middleware with accurate status_code and response_time_ms)
     usage_log = UsageLog(
         api_key_id=api_key.id,
         endpoint=request.url.path,
         method=request.method,
-        status_code=200,  # Will be updated by middleware if different
+        status_code=200,  # Will be updated by middleware
         ip_address=request.client.host if request.client else None
     )
     db.add(usage_log)
     db.commit()
+    db.refresh(usage_log)
+
+    # Store usage log ID and database session in request state for middleware
+    request.state.usage_log_id = usage_log.id
+    request.state.db_for_logging = db
 
     return api_key

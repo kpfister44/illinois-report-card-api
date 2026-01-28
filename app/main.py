@@ -5,12 +5,16 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.api import health, years, schools, search, admin
+from app.middleware.logging import UsageLoggingMiddleware
 
 app = FastAPI(
     title="Illinois Report Card API",
     description="REST API for accessing Illinois public school data",
     version="0.1.0",
 )
+
+# Add middleware
+app.add_middleware(UsageLoggingMiddleware)
 
 
 @app.exception_handler(HTTPException)
