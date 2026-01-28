@@ -4,7 +4,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app.api import health, years, schools, search
+from app.api import health, years, schools, search, admin
 
 app = FastAPI(
     title="Illinois Report Card API",
@@ -34,3 +34,4 @@ app.include_router(health.router)
 app.include_router(years.router)
 app.include_router(schools.router)
 app.include_router(search.router)
+app.include_router(admin.router)

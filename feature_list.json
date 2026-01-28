@@ -84,7 +84,7 @@
       "Step 4: Verify key_prefix column contains first 8 characters",
       "Step 5: Verify authentication works by hashing provided key and comparing"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
