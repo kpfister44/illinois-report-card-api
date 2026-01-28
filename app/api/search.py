@@ -3,12 +3,13 @@
 
 from fastapi import APIRouter, Depends
 from app.dependencies import verify_api_key
+from app.models.database import APIKey
 
 router = APIRouter()
 
 
 @router.get("/search")
-async def search(q: str, api_key: str = Depends(verify_api_key)):
+async def search(q: str, api_key: APIKey = Depends(verify_api_key)):
     """Full-text search for schools, districts, and other entities."""
     # Stub implementation - will use FTS5 search later
     return {"data": [], "meta": {"count": 0, "query": q}}

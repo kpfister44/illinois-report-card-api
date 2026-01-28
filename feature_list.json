@@ -33,7 +33,7 @@
       "Step 4: Verify last_used_at is updated for the API key",
       "Step 5: Verify usage_logs table has a new entry for this request"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
