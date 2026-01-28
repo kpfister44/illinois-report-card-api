@@ -454,12 +454,45 @@ Following TDD methodology:
 - Message: "feat(admin): implement API key creation with SHA-256 hashing - test #7 passing"
 - Files: 4 changed, 168 insertions(+), 2 deletions(-)
 
+### Test #8: Usage Logging Implementation
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_admin.py)
+   - test_usage_logging_captures_all_requests
+   - Validates all 5 steps of test #8 requirements
+
+2. **Implemented minimum code to pass test:**
+   - Created app/middleware/logging.py with UsageLoggingMiddleware
+   - Middleware tracks response time from request start to response completion
+   - Captures actual HTTP status codes (not just default 200)
+   - Updates usage log entries with response_time_ms and status_code
+   - Stores timing info and log ID in request.state for middleware access
+   - Registered middleware in app/main.py
+
+3. **Test validates:**
+   - All requests create usage log entries
+   - Logs contain: api_key_id, endpoint, method
+   - Logs contain: status_code, response_time_ms, timestamp
+   - IP address is captured
+
+## Current Status
+- **12 tests passing** (17 total tests, tests #7-8 now passing)
+- **65 tests remaining**
+- Full usage logging infrastructure in place
+
+## Git Commits
+- Commit 53f430b: Test #7 (API key hashing)
+- Commit 7d2130d: Test #8 (Usage logging)
+
 ## Next Steps for Next Session
 
 Continue with Phase 2 (Data Import Pipeline):
 
-1. **Next test to implement:** Test #8 - Usage logging captures all requests
-   - OR continue with Phase 2 tests (#11-15) for CLI import functionality
+1. **Next tests to implement:** Phase 2 tests (#11-15) for CLI import functionality
+   - Test #11: CLI import command processes Excel file
+   - Test #12: CLI import --dry-run preview
+   - Test #13: CLI import --list-years
+   - Test #14: CLI import --detect-schema
 
 2. **Schema Detector** (needed for import):
    - Build app/utils/schema_detector.py
@@ -469,17 +502,17 @@ Continue with Phase 2 (Data Import Pipeline):
 3. **CLI Import Command:**
    - Build app/cli/import_data.py
    - Implement --dry-run, --list-years, --detect-schema flags
-   - Tests #11-14 cover CLI functionality
+   - Create year-partitioned tables dynamically
+   - Use existing data cleaners
 
-4. **Admin Import Endpoints:**
+4. **Admin Import Endpoints** (later):
    - POST /admin/import (upload Excel files)
    - GET /admin/import/status/{id} (check import progress)
    - Tests #15-21 cover admin import API
 
 ## Notes
-- Admin endpoint infrastructure is now in place
-- Next session should focus on either:
-  1. Test #8 (Usage logging) - quick win
-  2. Or jump to Phase 2 import tests (#11-15) - more substantial work
-- All previous tests remain passing
+- Completed 2 tests this session (tests #7-8)
+- Auth and logging infrastructure complete
+- Next session should focus on Phase 2 import functionality
+- All tests remain passing
 - Following TDD strictly throughout
