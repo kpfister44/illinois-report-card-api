@@ -155,3 +155,45 @@ The project is initialized and ready for implementation. The /health endpoint is
 - Working directory: /Users/kyle.pfister/ReportCardAPI
 - Python: 3.12+ required
 - Package manager: uv
+
+---
+
+# Claude Progress - Session 2 (Coding Agent)
+
+## Date: 2026-01-27
+
+## Summary
+Fixed build configuration issue and verified health endpoint functionality.
+
+## Completed Tasks
+
+### 1. Fixed pyproject.toml Build Configuration
+- Issue: `uv` install was failing with "Unable to determine which files to ship inside the wheel"
+- Root cause: Missing hatchling configuration to specify package location
+- Solution: Added `[tool.hatch.build.targets.wheel]` section with `packages = ["app"]`
+- Commit: 18b11ac
+
+### 2. Verified Health Endpoint (Test #1)
+- Ran pytest: `test_health_endpoint_returns_ok` PASSED
+- Manual verification: `curl http://localhost:8000/health` returns `{"status":"ok"}`
+- Updated feature_list.json: marked test #1 as passing
+- Commit: a553be5
+
+## Current State
+- 1 test passing out of 77 total tests
+- 76 tests remaining
+- Development environment fully functional
+- FastAPI server running and responding correctly
+
+## Next Steps
+The next session should focus on implementing authentication infrastructure (Tests #2-6):
+1. Create database models (entities_master, api_keys, schema_metadata, usage_logs)
+2. Set up SQLite database connection
+3. Implement API key authentication middleware
+4. Write tests for authentication flow
+5. Implement /years endpoint (Test #7)
+
+## Notes
+- The health endpoint was already implemented in Session 1 but not marked as passing
+- Build fix was required before any tests could run
+- Server is running on http://localhost:8000
