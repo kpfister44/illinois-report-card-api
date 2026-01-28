@@ -343,3 +343,64 @@ Start with the core import functionality:
 - Excel file: ~/Downloads/Report-Card-Public-Data-Set.xlsx
 - Reference code: ~/IllinoisSchoolData/
 - App spec: app_spec.txt lines 481-529 (data import section)
+
+---
+
+# Session 3 Continued - Phase 2 Implementation Started
+
+## Data Files Imported
+- Copied 16 years of Report Card data (2010-2024) from IllinoisSchoolData
+- Files located in data/report-cards/
+- Total size: 162MB
+- Excluded from git via .gitignore
+
+## Phase 2 Progress: Data Cleaning Complete
+
+### Implemented and Tested (4 tests passing):
+1. **clean_percentage()** - "75.5%" → 75.5
+2. **clean_enrollment()** - "1,250" → 1250
+3. **handle_suppressed()** - "*" → None
+4. **normalize_column_name()** - "School Name" → "school_name"
+
+All functions handle edge cases (None, empty strings, already-clean values).
+
+### Excel File Structure Analysis:
+- 2024 Report Card has **949 columns** and 15 sheets
+- Main data in "General" sheet
+- RCDTS is primary identifier
+- Type field: "District", "School", "State"
+- Percentage columns use "%" suffix
+- Enrollment values may have commas
+
+## Current Status
+- **10 tests passing** (6 auth + 4 data cleaning)
+- **67 tests remaining**
+
+## Next Steps for Next Session
+
+1. **Create Missing Database Models:**
+   - SchemaMetadata table (track column metadata per year)
+   - EntitiesMaster table (stable RCDTS identifiers)
+
+2. **Build Excel Parser** (app/utils/excel_parser.py):
+   - Read Excel file with openpyxl (now installed)
+   - Handle multiple sheets
+   - Return structured data
+
+3. **Build Schema Detector** (app/utils/schema_detector.py):
+   - Auto-detect column types
+   - Categorize columns (demographics, assessment, enrollment)
+   - Flag suppressed indicator columns
+
+4. **Build CLI Import Command** (app/cli/import_data.py):
+   - Parse arguments
+   - Create year-partitioned tables dynamically
+   - Use data cleaners for import
+   - Populate schema_metadata
+   - Update entities_master
+
+5. **Test CLI Import:**
+   - Use data/report-cards/24-RC-Pub-Data-Set.xlsx
+   - Verify schools_2024 table created
+   - Verify schema_metadata populated
+   - Verify entities_master updated
