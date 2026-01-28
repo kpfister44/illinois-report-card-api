@@ -152,7 +152,7 @@
       "Step 3: Query the imported data",
       "Step 4: Verify empty values stored as NULL (not empty string)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -163,7 +163,7 @@
       "Step 3: Verify data from all sheets is combined correctly",
       "Step 4: Verify school records have data from all relevant sheets"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
