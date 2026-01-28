@@ -180,7 +180,7 @@
       "Step 9: Verify assessment columns categorized as 'assessment'",
       "Step 10: Verify enrollment columns categorized as 'enrollment'"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
