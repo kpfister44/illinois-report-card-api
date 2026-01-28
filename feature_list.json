@@ -21,7 +21,7 @@
       "Step 6: Send GET request to /search?q=chicago without Authorization header",
       "Step 7: Verify response status code is 401"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
