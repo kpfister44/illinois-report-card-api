@@ -404,3 +404,82 @@ All functions handle edge cases (None, empty strings, already-clean values).
    - Verify schools_2024 table created
    - Verify schema_metadata populated
    - Verify entities_master updated
+
+---
+
+# Claude Progress - Session 4 (Coding Agent)
+
+## Date: 2026-01-28
+
+## Summary
+Completed Test #7 (API key hashing) - implemented secure admin endpoint for creating API keys with SHA-256 hashing.
+
+## Session Start: Verification Tests
+- Ran full test suite: All 15 tests passing
+- Verified health endpoint, authentication, rate limiting, data cleaning, and Excel parsing
+- No functional or visual issues found
+- Noted deprecation warnings (Pydantic, SQLAlchemy datetime) - not blocking, will address later
+
+## Completed Tasks
+
+### Test #7: API Key Hashing Implementation
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_admin.py)
+   - test_admin_create_api_key_with_hashing
+   - Validates all 5 steps of test #7 requirements
+
+2. **Implemented minimum code to pass test:**
+   - Created app/api/admin.py with admin router
+   - POST /admin/keys endpoint (admin only)
+   - Secure key generation: rcapi_<32 random hex>
+   - SHA-256 hashing before database storage
+   - Returns plaintext key only once during creation
+   - Admin authentication dependency (verify_admin_api_key)
+   - Registered admin router in app/main.py
+
+3. **Test validates:**
+   - API keys are hashed with SHA-256 (not stored plaintext)
+   - key_prefix contains first 8 characters for display
+   - Authentication works by hashing and comparing
+   - Admin-only endpoint (requires is_admin=True)
+
+## Current Status
+- **11 tests passing** (16 total tests, test #7 now passing)
+- **66 tests remaining**
+- Admin infrastructure in place for future admin endpoints
+
+## Git Commit
+- Commit: 53f430b
+- Message: "feat(admin): implement API key creation with SHA-256 hashing - test #7 passing"
+- Files: 4 changed, 168 insertions(+), 2 deletions(-)
+
+## Next Steps for Next Session
+
+Continue with Phase 2 (Data Import Pipeline):
+
+1. **Next test to implement:** Test #8 - Usage logging captures all requests
+   - OR continue with Phase 2 tests (#11-15) for CLI import functionality
+
+2. **Schema Detector** (needed for import):
+   - Build app/utils/schema_detector.py
+   - Auto-detect column types
+   - Categorize columns
+
+3. **CLI Import Command:**
+   - Build app/cli/import_data.py
+   - Implement --dry-run, --list-years, --detect-schema flags
+   - Tests #11-14 cover CLI functionality
+
+4. **Admin Import Endpoints:**
+   - POST /admin/import (upload Excel files)
+   - GET /admin/import/status/{id} (check import progress)
+   - Tests #15-21 cover admin import API
+
+## Notes
+- Admin endpoint infrastructure is now in place
+- Next session should focus on either:
+  1. Test #8 (Usage logging) - quick win
+  2. Or jump to Phase 2 import tests (#11-15) - more substantial work
+- All previous tests remain passing
+- Following TDD strictly throughout
