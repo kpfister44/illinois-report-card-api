@@ -436,7 +436,7 @@
       "Step 3: Verify error response has code NOT_FOUND",
       "Step 4: Verify error message includes the requested rcdts"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

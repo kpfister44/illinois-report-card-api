@@ -1081,3 +1081,67 @@ def test_get_single_school_supports_field_selection(client):
     # Step 5: Note - rcdts may or may not be included (we didn't request it)
     # In this implementation, it should NOT be included since we didn't request it
     assert "rcdts" not in school
+
+
+def test_get_single_school_returns_404_for_nonexistent_school(client):
+    """Test #35: GET /schools/{year}/{rcdts} returns 404 for non-existent school."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_404_school_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create year table with at least one school (so the year is valid)
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"}
+        ]
+
+        create_year_table(2025, "schools", schema, engine)
+
+        # Insert a school so the table is not empty
+        table_name = "schools_2025"
+        data = {
+            "rcdts": "05-016-2140-17-0002",
+            "school_name": "Existing School"
+        }
+
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join([f":{k}" for k in data.keys()])
+        sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        db.execute(text(sql), data)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request to /schools/2025/99-999-9999-99-9999 (non-existent)
+    response = client.get(
+        "/schools/2025/99-999-9999-99-9999",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response status code is 404
+    assert response.status_code == 404
+
+    # Step 3: Verify error response has code NOT_FOUND
+    error_data = response.json()
+    assert "code" in error_data
+    assert error_data["code"] == "NOT_FOUND"
+
+    # Step 4: Verify error message includes the requested rcdts
+    assert "message" in error_data
+    assert "99-999-9999-99-9999" in error_data["message"]
