@@ -907,3 +907,92 @@ def test_get_schools_returns_400_for_invalid_year(client):
     # Step 4: Verify error message indicates available years
     assert "message" in error_data
     assert "year" in error_data["message"].lower() or "2030" in error_data["message"]
+
+
+def test_get_single_school_returns_school_with_all_fields(client):
+    """Test #33: GET /schools/{year}/{rcdts} returns single school with all available fields."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_single_school_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import a school with rcdts 05-016-2140-17-0002 and known set of columns
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"},
+            {"column_name": "type", "data_type": "string"}
+        ]
+
+        create_year_table(2025, "schools", schema, engine)
+
+        table_name = "schools_2025"
+        data = {
+            "rcdts": "05-016-2140-17-0002",
+            "school_name": "Lincoln Elementary",
+            "city": "Springfield",
+            "county": "Sangamon",
+            "enrollment": 450,
+            "type": "elementary"
+        }
+
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join([f":{k}" for k in data.keys()])
+        sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        db.execute(text(sql), data)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /schools/2025/05-016-2140-17-0002
+    response = client.get(
+        "/schools/2025/05-016-2140-17-0002",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify response has data object (not array)
+    response_data = response.json()
+    assert "data" in response_data
+    assert isinstance(response_data["data"], dict)
+    assert not isinstance(response_data["data"], list)
+
+    # Step 5: Verify data contains all columns that exist in the schools_2025 table for this record
+    school = response_data["data"]
+    assert school["rcdts"] == "05-016-2140-17-0002"
+    assert school["school_name"] == "Lincoln Elementary"
+    assert school["city"] == "Springfield"
+    assert school["county"] == "Sangamon"
+    assert school["enrollment"] == 450
+    assert school["type"] == "elementary"
+
+    # Should also have id and imported_at from the table schema
+    assert "id" in school
+    assert "imported_at" in school
+
+    # Step 6: Verify meta.year equals 2025
+    assert "meta" in response_data
+    assert response_data["meta"]["year"] == 2025
+
+    # Step 7: Verify meta.fields_returned matches actual number of fields in response
+    assert "fields_returned" in response_data["meta"]
+    assert response_data["meta"]["fields_returned"] == len(school.keys())
