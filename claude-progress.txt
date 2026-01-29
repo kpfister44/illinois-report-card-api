@@ -902,3 +902,98 @@ All foundational pieces are now in place:
 - ✓ Year-partitioned table creation
 
 Ready to build the CLI import orchestration in next session.
+
+---
+
+# Claude Progress - Session 6 (Coding Agent)
+
+## Date: 2026-01-28
+
+## Summary
+Completed Test #21 (GET /years endpoint) - implemented endpoint to return list of available data years from year-partitioned tables.
+
+## Session Start: Verification Tests
+- Ran health and authentication tests: All passing
+- No functional or visual issues found
+- Server running on port 8000
+
+## Completed Tasks
+
+### Test #21: GET /years Endpoint Implementation
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_years.py)
+   - Creates year-partitioned tables for 2024 and 2025
+   - Validates all 5 steps of test #21 requirements
+   - Uses standard test patterns from existing tests
+
+2. **Implemented minimum code to pass test** (app/api/years.py):
+   - Query database for all year-partitioned tables using SQLAlchemy inspect
+   - Extract years from table names (format: schools_YYYY, districts_YYYY)
+   - Return sorted years (descending) with count metadata
+   - Response format: {"data": [2025, 2024, ...], "meta": {"count": N}}
+
+3. **Fixed test isolation bug**:
+   - Issue: Dynamic tables persisted between tests causing schema conflicts
+   - Root cause: conftest.py only dropped Base.metadata tables, not dynamic ones
+   - Fix: Updated setup_database fixture to reflect and drop ALL tables
+   - Result: All 38 tests passing with proper isolation
+
+4. **Test validates:**
+   - Endpoint returns 200 status with valid API key
+   - Data array contains all available years (2024, 2025)
+   - Meta.count matches number of years
+   - Years extracted from both schools_YYYY and districts_YYYY tables
+
+## Current Status
+- **21 feature tests passing** (86 total feature tests in feature_list.json)
+- **65 feature tests remaining**
+- **38 pytest tests passing** (all unit and integration tests)
+  - 11 API endpoint tests (including new /years test)
+  - 1 rate limiting test
+  - 6 CLI integration tests
+  - 4 table manager tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Git Commit
+- Commit: befc280
+- Message: "feat(api): implement GET /years endpoint - test #21 passing"
+- Files: 4 changed (131 insertions, 7 deletions)
+
+## Technical Notes
+- GET /years uses SQLAlchemy inspector to query table names dynamically
+- Handles both schools_YYYY and districts_YYYY patterns
+- Returns years in descending order (most recent first)
+- Test isolation critical for dynamic table tests - must drop all tables
+
+## Next Steps for Next Session
+
+Continue with Phase 3 (Core REST API) - Schema Endpoints:
+
+1. **Test #22: GET /schema/{year}** (7 steps)
+   - Return field metadata for specified year
+   - Query schema_metadata table
+   - Return columns with data types, categories, descriptions
+
+2. **Test #23: GET /schema/{year}/{category}** (7 steps)
+   - Filter schema metadata by category
+   - Support demographics, assessment, enrollment, etc.
+
+3. **Test #24: GET /schools/{year}** (11 steps)
+   - List schools with pagination
+   - Support filtering and field selection
+
+4. **Test #25+: Additional school endpoints**
+   - Field selection
+   - Filtering by city, county, type
+   - Sorting
+   - Error handling
+
+## Notes
+- Completed 1 test this session (test #21)
+- Following TDD strictly throughout
+- Fixed critical test isolation bug that will prevent future issues
+- All tests remain passing
+- API endpoints starting to take shape - /health, /years complete
