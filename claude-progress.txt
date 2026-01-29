@@ -1424,11 +1424,28 @@ Following TDD methodology:
    - Schools ordered correctly by name ascending [Apple, Banana, Mango, Zebra]
    - Invalid sort field returns 400 error with code INVALID_PARAMETER
 
+### Test #30: GET /schools/{year} Maximum Limit Enforcement
+Following TDD methodology:
+
+1. **Wrote test** (tests/test_api/test_schools.py)
+   - Validates all 3 steps of test #30 requirements
+   - Tests ?limit=2000 parameter
+
+2. **No implementation needed**:
+   - FastAPI Query validation already enforces le=1000
+   - Parameter defined as: `limit: int = Query(default=100, ge=1, le=1000)`
+   - Returns 422 validation error for limits > 1000
+   - Test documents existing behavior
+
+3. **Test validates:**
+   - Request with limit=2000 returns 422 validation error
+   - FastAPI automatically validates parameter constraints
+
 ## Session 8 Final Status
-- **29 feature tests passing** (86 total feature tests in feature_list.json)
-- **57 feature tests remaining**
-- **46 pytest tests passing** (all unit and integration tests)
-  - 19 API endpoint tests (health, auth, years, schema x2, schools x6)
+- **30 feature tests passing** (86 total feature tests in feature_list.json)
+- **56 feature tests remaining**
+- **47 pytest tests passing** (all unit and integration tests)
+  - 20 API endpoint tests (health, auth, years, schema x2, schools x7)
   - 1 rate limiting test
   - 6 CLI integration tests
   - 4 table manager tests
@@ -1438,13 +1455,15 @@ Following TDD methodology:
 
 ## Git Commits This Session
 - Commit 0cf2083: Test #27 (County filter)
-- Commit b41715b: Progress notes update
+- Commit b41715b: Progress notes update (mid-session)
 - Commit 7fe3cdd: Test #28 (Type filter)
 - Commit b6fa174: Test #29 (Sorting)
+- Commit 190ab9b: Progress notes update (mid-session)
+- Commit e449f9e: Test #30 (Maximum limit)
 
 ## Session Summary
-- **Completed 3 tests this session (tests #27, #28, #29)**
-- **Progress: 33.7% complete (29/86 tests passing)**
+- **Completed 4 tests this session (tests #27, #28, #29, #30)**
+- **Progress: 34.9% complete (30/86 tests passing)**
 - Enhanced schools endpoint with comprehensive filtering and sorting:
   - Filters: city, county, type (all combinable with AND logic)
   - Sorting: any field, ascending or descending
