@@ -4,7 +4,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app.api import health, years, schema, schools, districts, search, admin
+from app.api import health, years, schema, schools, districts, state, search, admin
 from app.middleware.logging import UsageLoggingMiddleware
 
 app = FastAPI(
@@ -39,5 +39,6 @@ app.include_router(years.router)
 app.include_router(schema.router)
 app.include_router(schools.router)
 app.include_router(districts.router)
+app.include_router(state.router)
 app.include_router(search.router)
 app.include_router(admin.router)

@@ -545,7 +545,7 @@
       "Step 4: Verify response has data object with state aggregates",
       "Step 5: Verify state-level metrics are present (total enrollment, averages, etc.)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
