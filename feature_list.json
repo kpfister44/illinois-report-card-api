@@ -425,7 +425,7 @@
       "Step 4: Verify unrequested fields are NOT present in response",
       "Step 5: Note: rcdts may or may not be included depending on implementation choice"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

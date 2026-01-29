@@ -996,3 +996,88 @@ def test_get_single_school_returns_school_with_all_fields(client):
     # Step 7: Verify meta.fields_returned matches actual number of fields in response
     assert "fields_returned" in response_data["meta"]
     assert response_data["meta"]["fields_returned"] == len(school.keys())
+
+
+def test_get_single_school_supports_field_selection(client):
+    """Test #34: GET /schools/{year}/{rcdts} supports field selection."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_single_school_fields_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Import a school with multiple fields
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"},
+            {"column_name": "act_composite", "data_type": "float"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"}
+        ]
+
+        create_year_table(2025, "schools", schema, engine)
+
+        table_name = "schools_2025"
+        data = {
+            "rcdts": "05-016-2140-17-0002",
+            "school_name": "Lincoln High School",
+            "enrollment": 850,
+            "act_composite": 23.5,
+            "city": "Springfield",
+            "county": "Sangamon"
+        }
+
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join([f":{k}" for k in data.keys()])
+        sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        db.execute(text(sql), data)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request with fields parameter
+    response = client.get(
+        "/schools/2025/05-016-2140-17-0002?fields=school_name,enrollment,act_composite",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 3: Verify only requested fields are present in response data
+    response_data = response.json()
+    school = response_data["data"]
+
+    assert "school_name" in school
+    assert school["school_name"] == "Lincoln High School"
+
+    assert "enrollment" in school
+    assert school["enrollment"] == 850
+
+    assert "act_composite" in school
+    assert school["act_composite"] == 23.5
+
+    # Step 4: Verify unrequested fields are NOT present in response
+    assert "city" not in school
+    assert "county" not in school
+    assert "id" not in school
+    assert "imported_at" not in school
+
+    # Step 5: Note - rcdts may or may not be included (we didn't request it)
+    # In this implementation, it should NOT be included since we didn't request it
+    assert "rcdts" not in school
