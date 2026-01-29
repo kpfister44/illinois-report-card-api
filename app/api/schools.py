@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import text, inspect
 from app.dependencies import verify_api_key, get_db
 from app.models.database import APIKey
-from app.services.table_manager import get_year_table
+from app.services.table_manager import get_year_table, get_available_years
 
 router = APIRouter()
 
@@ -30,7 +30,18 @@ async def get_schools(
     table = get_year_table(year, "schools", db.bind)
 
     if table is None:
-        return {"data": [], "meta": {"total": 0, "limit": limit, "offset": offset}}
+        # Get available years to include in error message
+        available_years = get_available_years("schools", db.bind)
+        if available_years:
+            years_str = ", ".join(str(y) for y in available_years)
+            message = f"No data available for year {year}. Available years: {years_str}"
+        else:
+            message = f"No data available for year {year}. No school data has been imported yet."
+
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PARAMETER", "message": message}
+        )
 
     # Validate sort field if provided
     if sort:

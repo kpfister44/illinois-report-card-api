@@ -857,3 +857,53 @@ def test_get_schools_supports_combining_multiple_filters(client):
     assert "Chicago Elementary 2" in school_names
     assert "Chicago High 1" not in school_names
     assert "Springfield Elementary 1" not in school_names
+
+
+def test_get_schools_returns_400_for_invalid_year(client):
+    """Test #32: GET /schools/{year} returns 400 for invalid year."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_invalid_year_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create a valid year table for comparison (2025)
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"}
+        ]
+        create_year_table(2025, "schools", schema, engine)
+
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request to /schools/2030 (non-existent year)
+    response = client.get(
+        "/schools/2030",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response status code is 400
+    assert response.status_code == 400
+
+    # Step 3: Verify error response has code INVALID_PARAMETER
+    error_data = response.json()
+    assert "code" in error_data
+    assert error_data["code"] == "INVALID_PARAMETER"
+
+    # Step 4: Verify error message indicates available years
+    assert "message" in error_data
+    assert "year" in error_data["message"].lower() or "2030" in error_data["message"]

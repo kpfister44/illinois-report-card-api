@@ -106,3 +106,32 @@ def table_exists(table_name: str, engine) -> bool:
     """
     inspector = inspect(engine)
     return table_name in inspector.get_table_names()
+
+
+def get_available_years(entity_type: str, engine) -> List[int]:
+    """
+    Get list of years that have tables for the given entity type.
+
+    Args:
+        entity_type: Type of entity (e.g., "schools", "districts")
+        engine: SQLAlchemy engine
+
+    Returns:
+        List of years (sorted ascending) that have tables for this entity type
+    """
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+
+    years = []
+    prefix = f"{entity_type}_"
+
+    for table_name in table_names:
+        if table_name.startswith(prefix):
+            try:
+                year = int(table_name[len(prefix):])
+                years.append(year)
+            except ValueError:
+                # Skip tables that don't end with a valid year
+                continue
+
+    return sorted(years)
