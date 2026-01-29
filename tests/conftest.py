@@ -38,7 +38,11 @@ def setup_database():
     """Create tables before each test, drop after."""
     Base.metadata.create_all(bind=engine)
     yield
-    Base.metadata.drop_all(bind=engine)
+    # Drop all tables including dynamic ones
+    from sqlalchemy import MetaData, inspect
+    metadata = MetaData()
+    metadata.reflect(bind=engine)
+    metadata.drop_all(bind=engine)
 
 
 @pytest.fixture

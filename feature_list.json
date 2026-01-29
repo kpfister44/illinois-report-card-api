@@ -254,7 +254,7 @@
       "Step 4: Verify response body has data array containing [2024, 2025]",
       "Step 5: Verify response body has meta.count equal to 2"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
