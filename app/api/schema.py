@@ -46,3 +46,39 @@ async def get_schema_for_year(
             "count": len(data)
         }
     }
+
+
+@router.get("/schema/{year}/{category}")
+async def get_schema_for_year_and_category(
+    year: int,
+    category: str,
+    api_key: APIKey = Depends(verify_api_key),
+    db: Session = Depends(get_db)
+):
+    """Returns field metadata for a specific year filtered by category."""
+    # Query schema_metadata for the given year and category
+    metadata_entries = db.query(SchemaMetadata).filter(
+        SchemaMetadata.year == year,
+        SchemaMetadata.category == category
+    ).all()
+
+    # Convert to response format (empty array if no matches)
+    data = []
+    for entry in metadata_entries:
+        data.append({
+            "column_name": entry.column_name,
+            "data_type": entry.data_type,
+            "category": entry.category,
+            "description": entry.description,
+            "source_column_name": entry.source_column_name,
+            "is_suppressed_indicator": entry.is_suppressed_indicator
+        })
+
+    return {
+        "data": data,
+        "meta": {
+            "year": year,
+            "category": category,
+            "count": len(data)
+        }
+    }

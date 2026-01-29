@@ -282,7 +282,7 @@
       "Step 6: Send GET request to /schema/2025/invalid_category",
       "Step 7: Verify response returns empty array or appropriate error"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

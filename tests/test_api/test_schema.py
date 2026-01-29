@@ -136,3 +136,123 @@ def test_get_schema_returns_field_metadata_for_year(client):
 
     enrollment_metadata = next(m for m in data["data"] if m["column_name"] == "enrollment")
     assert enrollment_metadata["is_suppressed_indicator"] is False
+
+
+def test_get_schema_filters_by_category(client):
+    """Test #23: GET /schema/{year}/{category} filters fields by category."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    # Step 1: Ensure schema_metadata has columns in multiple categories
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_category_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create year table
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"},
+            {"column_name": "white_pct", "data_type": "percentage"},
+            {"column_name": "act_composite", "data_type": "float"},
+        ]
+        create_year_table(2025, "schools", schema, engine)
+
+        # Populate with multiple categories
+        metadata_entries = [
+            SchemaMetadata(
+                year=2025,
+                table_name="schools_2025",
+                column_name="rcdts",
+                data_type="string",
+                category="identifier",
+                description="School ID",
+                source_column_name="RCDTS",
+                is_suppressed_indicator=False
+            ),
+            SchemaMetadata(
+                year=2025,
+                table_name="schools_2025",
+                column_name="enrollment",
+                data_type="integer",
+                category="enrollment",
+                description="Total enrollment",
+                source_column_name="Enrollment",
+                is_suppressed_indicator=False
+            ),
+            SchemaMetadata(
+                year=2025,
+                table_name="schools_2025",
+                column_name="white_pct",
+                data_type="percentage",
+                category="demographics",
+                description="Percentage white",
+                source_column_name="White %",
+                is_suppressed_indicator=True
+            ),
+            SchemaMetadata(
+                year=2025,
+                table_name="schools_2025",
+                column_name="act_composite",
+                data_type="float",
+                category="assessment",
+                description="ACT composite score",
+                source_column_name="ACT Composite",
+                is_suppressed_indicator=False
+            ),
+        ]
+
+        for entry in metadata_entries:
+            db.add(entry)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /schema/2025/demographics
+    response = client.get(
+        "/schema/2025/demographics",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    data = response.json()
+    assert "data" in data
+
+    # Step 4: Verify all returned fields have category equal to demographics
+    assert len(data["data"]) == 1
+    for field in data["data"]:
+        assert field["category"] == "demographics"
+
+    # Step 5: Verify no fields from other categories are included
+    column_names = [f["column_name"] for f in data["data"]]
+    assert "white_pct" in column_names
+    assert "enrollment" not in column_names  # enrollment category
+    assert "act_composite" not in column_names  # assessment category
+    assert "rcdts" not in column_names  # identifier category
+
+    # Step 6: Send GET request to /schema/2025/invalid_category
+    response = client.get(
+        "/schema/2025/invalid_category",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 7: Verify response returns empty array
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert len(data["data"]) == 0
