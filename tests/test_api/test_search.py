@@ -90,3 +90,86 @@ def test_get_search_returns_full_text_results(client):
     assert "meta" in data
     assert "total" in data["meta"]
     assert data["meta"]["total"] == 2
+
+
+def test_get_search_filters_by_entity_type(client):
+    """Test #48: GET /search filters by entity type."""
+    from tests.conftest import TestingSessionLocal
+
+    # Step 1: Import schools and districts with similar names
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "test_search_type_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix="test_typ",
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="standard",
+            is_admin=False
+        )
+        db.add(api_key)
+
+        # Create entities with similar names but different types
+        entities = [
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0001",
+                entity_type="school",
+                name="Springfield Elementary",
+                city="Springfield",
+                county="Sangamon"
+            ),
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0002",
+                entity_type="school",
+                name="Springfield High School",
+                city="Springfield",
+                county="Sangamon"
+            ),
+            EntitiesMaster(
+                rcdts="05-016-2140-00-0000",
+                entity_type="district",
+                name="Springfield School District",
+                city="Springfield",
+                county="Sangamon"
+            )
+        ]
+
+        for entity in entities:
+            db.add(entity)
+
+        db.commit()
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /search?q=Springfield&type=school
+    response = client.get(
+        "/search?q=Springfield&type=school",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+    data = response.json()
+
+    # Step 4: Verify only schools are returned (no districts)
+    results = data["data"]
+    assert len(results) == 2, f"Expected 2 schools, got {len(results)}"
+    for result in results:
+        assert result["entity_type"] == "school", f"Expected school, got {result['entity_type']}"
+
+    # Step 5: Send GET request with ?type=district
+    response = client.get(
+        "/search?q=Springfield&type=district",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 6: Verify only districts are returned
+    assert response.status_code == 200
+    data = response.json()
+    results = data["data"]
+    assert len(results) == 1, f"Expected 1 district, got {len(results)}"
+    assert results[0]["entity_type"] == "district"

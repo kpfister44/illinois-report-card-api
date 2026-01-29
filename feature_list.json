@@ -608,7 +608,7 @@
       "Step 5: Send GET request with ?type=district",
       "Step 6: Verify only districts are returned"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
