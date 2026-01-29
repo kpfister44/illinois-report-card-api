@@ -715,3 +715,145 @@ def test_get_schools_enforces_maximum_limit(client):
     error_data = response.json()
     assert "detail" in error_data
     # FastAPI validation error format includes information about the constraint
+
+
+def test_get_schools_supports_combining_multiple_filters(client):
+    """Test #31: GET /schools/{year} supports combining multiple filters."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_combined_filters_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create schema for schools_2025 table
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"},
+            {"column_name": "type", "data_type": "string"}
+        ]
+
+        # Create year table
+        create_year_table(2025, "schools", schema, engine)
+
+        # Step 1: Import schools with various cities and types
+        table_name = "schools_2025"
+        schools_data = [
+            {
+                "rcdts": "01-001-0010-26-2025",
+                "school_name": "Chicago Elementary 1",
+                "city": "Chicago",
+                "county": "Cook",
+                "type": "elementary"
+            },
+            {
+                "rcdts": "01-002-0020-26-2025",
+                "school_name": "Chicago Elementary 2",
+                "city": "Chicago",
+                "county": "Cook",
+                "type": "elementary"
+            },
+            {
+                "rcdts": "01-003-0030-26-2025",
+                "school_name": "Chicago High 1",
+                "city": "Chicago",
+                "county": "Cook",
+                "type": "high"
+            },
+            {
+                "rcdts": "01-004-0040-26-2025",
+                "school_name": "Chicago High 2",
+                "city": "Chicago",
+                "county": "Cook",
+                "type": "high"
+            },
+            {
+                "rcdts": "01-005-0050-26-2025",
+                "school_name": "Springfield High 1",
+                "city": "Springfield",
+                "county": "Sangamon",
+                "type": "high"
+            },
+            {
+                "rcdts": "01-006-0060-26-2025",
+                "school_name": "Springfield Elementary 1",
+                "city": "Springfield",
+                "county": "Sangamon",
+                "type": "elementary"
+            }
+        ]
+
+        for data in schools_data:
+            columns = ", ".join(data.keys())
+            placeholders = ", ".join([f":{k}" for k in data.keys()])
+            sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            db.execute(text(sql), data)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /schools/2025?city=Chicago&type=high
+    response = client.get(
+        "/schools/2025?city=Chicago&type=high",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify all returned schools are in Chicago AND are high schools
+    data = response.json()
+    assert "data" in data
+    assert len(data["data"]) == 2  # Should have exactly 2 Chicago high schools
+
+    for school in data["data"]:
+        assert school["city"] == "Chicago"
+        assert school["type"] == "high"
+
+    # Step 5: Verify Chicago elementary schools are NOT included
+    school_names = [school["school_name"] for school in data["data"]]
+    assert "Chicago High 1" in school_names
+    assert "Chicago High 2" in school_names
+    assert "Chicago Elementary 1" not in school_names
+    assert "Chicago Elementary 2" not in school_names
+
+    # Step 6: Verify Springfield high schools are NOT included
+    assert "Springfield High 1" not in school_names
+
+    # Step 7: Send GET request with ?city=Chicago&county=Cook&type=elementary
+    response = client.get(
+        "/schools/2025?city=Chicago&county=Cook&type=elementary",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 8: Verify all three filters are applied together correctly
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["data"]) == 2  # Should have exactly 2 Chicago elementary schools in Cook county
+
+    for school in data["data"]:
+        assert school["city"] == "Chicago"
+        assert school["county"] == "Cook"
+        assert school["type"] == "elementary"
+
+    school_names = [school["school_name"] for school in data["data"]]
+    assert "Chicago Elementary 1" in school_names
+    assert "Chicago Elementary 2" in school_names
+    assert "Chicago High 1" not in school_names
+    assert "Springfield Elementary 1" not in school_names

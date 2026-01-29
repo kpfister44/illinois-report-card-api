@@ -388,7 +388,7 @@
       "Step 7: Send GET request with ?city=Chicago&county=Cook&type=elementary",
       "Step 8: Verify all three filters are applied together correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
