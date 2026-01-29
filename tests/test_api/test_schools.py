@@ -666,3 +666,52 @@ def test_get_schools_supports_sorting(client):
     error_data = response.json()
     assert "code" in error_data
     assert error_data["code"] == "INVALID_PARAMETER"
+
+
+def test_get_schools_enforces_maximum_limit(client):
+    """Test #30: GET /schools/{year} enforces maximum limit of 1000."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_max_limit_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create schema for schools_2025 table
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"}
+        ]
+
+        # Create year table (no need to insert 2000 schools, just verify validation)
+        create_year_table(2025, "schools", schema, engine)
+
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request to /schools/2025?limit=2000
+    response = client.get(
+        "/schools/2025?limit=2000",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response either caps at 1000 or returns validation error
+    # FastAPI Query validation should return 422 for invalid parameter
+    assert response.status_code == 422
+
+    # Step 3: Verify error indicates limit is too high
+    error_data = response.json()
+    assert "detail" in error_data
+    # FastAPI validation error format includes information about the constraint

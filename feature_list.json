@@ -373,7 +373,7 @@
       "Step 2: Verify response either caps at 1000 or returns validation error",
       "Step 3: Verify no more than 1000 records are returned"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
