@@ -268,7 +268,7 @@
       "Step 6: Verify source_column_name is included for reference",
       "Step 7: Verify is_suppressed_indicator field is present for columns that use *"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
