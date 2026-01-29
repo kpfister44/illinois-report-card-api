@@ -173,3 +173,156 @@ def test_get_search_filters_by_entity_type(client):
     results = data["data"]
     assert len(results) == 1, f"Expected 1 district, got {len(results)}"
     assert results[0]["entity_type"] == "district"
+
+
+def test_get_search_filters_by_year(client):
+    """Test #49: GET /search filters by year."""
+    from tests.conftest import TestingSessionLocal, engine
+    from app.services.table_manager import create_year_table
+
+    # Step 1: Import data for years 2024 and 2025 with different entities
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "test_search_year_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix="test_yr",
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="standard",
+            is_admin=False
+        )
+        db.add(api_key)
+
+        # Create entities for 2024 (Lincoln schools)
+        entities_2024 = [
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0001",
+                entity_type="school",
+                name="Lincoln Elementary 2024",
+                city="Springfield",
+                county="Sangamon"
+            ),
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0002",
+                entity_type="school",
+                name="Lincoln High 2024",
+                city="Springfield",
+                county="Sangamon"
+            )
+        ]
+
+        # Create entities for 2025 (Washington schools)
+        entities_2025 = [
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0003",
+                entity_type="school",
+                name="Washington Elementary 2025",
+                city="Springfield",
+                county="Sangamon"
+            ),
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0004",
+                entity_type="school",
+                name="Washington High 2025",
+                city="Springfield",
+                county="Sangamon"
+            )
+        ]
+
+        # Add all entities to entities_master
+        for entity in entities_2024 + entities_2025:
+            db.add(entity)
+
+        db.commit()
+
+        # Create year-partitioned tables for 2024 and 2025
+        schema_2024 = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"}
+        ]
+
+        schema_2025 = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"}
+        ]
+
+        # Create tables
+        create_year_table(2024, "schools", schema_2024, engine)
+        create_year_table(2025, "schools", schema_2025, engine)
+
+        # Insert data into 2024 table
+        from sqlalchemy import text
+        for entity in entities_2024:
+            insert_query = text("""
+                INSERT INTO schools_2024 (rcdts, school_name, city)
+                VALUES (:rcdts, :name, :city)
+            """)
+            db.execute(insert_query, {
+                "rcdts": entity.rcdts,
+                "name": entity.name,
+                "city": entity.city
+            })
+
+        # Insert data into 2025 table
+        for entity in entities_2025:
+            insert_query = text("""
+                INSERT INTO schools_2025 (rcdts, school_name, city)
+                VALUES (:rcdts, :name, :city)
+            """)
+            db.execute(insert_query, {
+                "rcdts": entity.rcdts,
+                "name": entity.name,
+                "city": entity.city
+            })
+
+        db.commit()
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /search?q=Springfield&year=2024
+    # NOTE: Searching for "Springfield" will match entities from BOTH years in FTS5
+    # The year filter should restrict results to only 2024 entities
+    response = client.get(
+        "/search?q=Springfield&year=2024",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify only 2024 entities are returned
+    assert response.status_code == 200
+    data = response.json()
+    results = data["data"]
+    assert len(results) == 2, f"Expected 2 schools from 2024, got {len(results)}"
+
+    # Verify all results are from 2024 (contain "2024" in name)
+    for result in results:
+        assert "2024" in result["name"], f"Expected 2024 entity, got {result['name']}"
+        assert "2025" not in result["name"], f"2025 entity should not be in 2024 results: {result['name']}"
+
+    # Verify meta.total reflects filtered count
+    assert data["meta"]["total"] == 2
+
+    # Step 4: Send GET request with ?year=2025
+    response = client.get(
+        "/search?q=Springfield&year=2025",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 5: Verify only 2025 entities are returned
+    assert response.status_code == 200
+    data = response.json()
+    results = data["data"]
+    assert len(results) == 2, f"Expected 2 schools from 2025, got {len(results)}"
+
+    # Verify all results are from 2025 (contain "2025" in name)
+    for result in results:
+        assert "2025" in result["name"], f"Expected 2025 entity, got {result['name']}"
+        assert "2024" not in result["name"], f"2024 entity should not be in 2025 results: {result['name']}"
+
+    # Verify meta.total reflects filtered count
+    assert data["meta"]["total"] == 2

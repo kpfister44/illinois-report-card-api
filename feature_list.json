@@ -620,7 +620,7 @@
       "Step 4: Send GET request with ?year=2024",
       "Step 5: Verify only 2024 entities are returned"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
