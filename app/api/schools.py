@@ -18,6 +18,7 @@ async def get_schools(
     offset: int = Query(default=0, ge=0),
     fields: Optional[str] = Query(default=None),
     city: Optional[str] = Query(default=None),
+    county: Optional[str] = Query(default=None),
     api_key: APIKey = Depends(verify_api_key),
     db = Depends(get_db)
 ):
@@ -37,12 +38,18 @@ async def get_schools(
         field_list = None
 
     # Build WHERE clause for filters
-    where_clause = ""
+    where_conditions = []
     query_params = {"limit": limit, "offset": offset}
 
     if city:
-        where_clause = "WHERE city = :city"
+        where_conditions.append("city = :city")
         query_params["city"] = city
+
+    if county:
+        where_conditions.append("county = :county")
+        query_params["county"] = county
+
+    where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
     # Get total count with filters
     count_query = f"SELECT COUNT(*) as total FROM schools_{year} {where_clause}"

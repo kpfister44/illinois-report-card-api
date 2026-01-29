@@ -318,3 +318,110 @@ def test_get_schools_filters_by_city(client):
     assert "Chicago School 2" in school_names
     assert "Springfield School 1" not in school_names
     assert "Peoria School 1" not in school_names
+
+
+def test_get_schools_filters_by_county(client):
+    """Test #27: GET /schools/{year} filters by county."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_county_filter_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create schema for schools_2025 table
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"},
+            {"column_name": "type", "data_type": "string"}
+        ]
+
+        # Create year table
+        create_year_table(2025, "schools", schema, engine)
+
+        # Step 1: Import schools in multiple counties
+        table_name = "schools_2025"
+        schools_data = [
+            {
+                "rcdts": "01-001-0010-26-2025",
+                "school_name": "Cook County School 1",
+                "city": "Chicago",
+                "county": "Cook",
+                "enrollment": 500,
+                "type": "School"
+            },
+            {
+                "rcdts": "01-002-0020-26-2025",
+                "school_name": "Cook County School 2",
+                "city": "Evanston",
+                "county": "Cook",
+                "enrollment": 600,
+                "type": "School"
+            },
+            {
+                "rcdts": "01-003-0030-26-2025",
+                "school_name": "Sangamon County School 1",
+                "city": "Springfield",
+                "county": "Sangamon",
+                "enrollment": 450,
+                "type": "School"
+            },
+            {
+                "rcdts": "01-004-0040-26-2025",
+                "school_name": "DuPage County School 1",
+                "city": "Naperville",
+                "county": "DuPage",
+                "enrollment": 400,
+                "type": "School"
+            }
+        ]
+
+        for data in schools_data:
+            columns = ", ".join(data.keys())
+            placeholders = ", ".join([f":{k}" for k in data.keys()])
+            sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            db.execute(text(sql), data)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /schools/2025?county=Cook
+    response = client.get(
+        "/schools/2025?county=Cook",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify all returned schools have county equal to Cook
+    data = response.json()
+    assert "data" in data
+    assert len(data["data"]) == 2  # Should have exactly 2 Cook County schools
+
+    for school in data["data"]:
+        assert school["county"] == "Cook"
+
+    # Step 5: Verify schools from other counties are not included
+    school_names = [school["school_name"] for school in data["data"]]
+    assert "Cook County School 1" in school_names
+    assert "Cook County School 2" in school_names
+    assert "Sangamon County School 1" not in school_names
+    assert "DuPage County School 1" not in school_names
