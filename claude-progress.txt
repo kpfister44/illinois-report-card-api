@@ -1235,3 +1235,50 @@ Following TDD methodology:
 - Both features work together seamlessly
 - All 42 tests passing with no regressions
 - Clean codebase ready for next test
+
+### Test #26: GET /schools/{year} with City Filter
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_schools.py)
+   - Creates schools in multiple cities (Chicago, Springfield, Peoria)
+   - Tests ?city=Chicago parameter
+   - Validates only Chicago schools returned
+
+2. **Implemented minimum code to pass test** (app/api/schools.py):
+   - Added optional city query parameter
+   - Build WHERE clause when city filter provided
+   - Apply filter to both count and data queries
+   - Maintains backward compatibility (no city = all schools)
+
+3. **Test validates:**
+   - Endpoint returns 200 status with city filter
+   - Only schools in Chicago returned (2 schools)
+   - Schools from other cities excluded
+   - Total count reflects filtered results
+
+## Session 7 Updated Status (Test #26 Complete)
+- **26 feature tests passing** (86 total feature tests in feature_list.json)
+- **60 feature tests remaining**
+- **43 pytest tests passing** (all unit and integration tests)
+  - 16 API endpoint tests (health, auth, years, schema x2, schools x3)
+  - 1 rate limiting test
+  - 6 CLI integration tests
+  - 4 table manager tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Additional Git Commit (Test #26)
+- Commit: 0231139
+- Message: "feat(api): add city filter to GET /schools/{year} - test #26 passing"
+- Files: 3 changed (124 insertions, 8 deletions)
+
+## Session 7 Current Progress
+- **Completed 3 tests this session (tests #24, #25, #26)**
+- **Progress: 30.2% complete (26/86 tests passing)**
+- Schools endpoint now supports:
+  - Pagination (limit/offset)
+  - Field selection (comma-separated fields)
+  - City filtering (exact match)
+- All features work together seamlessly
+- All 43 tests passing with no regressions
