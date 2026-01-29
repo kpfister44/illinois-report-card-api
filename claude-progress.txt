@@ -1282,3 +1282,92 @@ Following TDD methodology:
   - City filtering (exact match)
 - All features work together seamlessly
 - All 43 tests passing with no regressions
+
+---
+
+# Claude Progress - Session 8 (Coding Agent)
+
+## Date: 2026-01-29
+
+## Summary
+Completed Test #27 (GET /schools/{year} with county filter) - enhanced filtering to support county parameter.
+
+## Session Start: Verification Tests
+- Ran health endpoint test: PASSED ✓
+- Ran years endpoint test: PASSED ✓
+- No functional or visual issues found
+- Server running on port 8000
+- Verified 26/86 tests passing before starting
+
+## Completed Tasks
+
+### Test #27: GET /schools/{year} with County Filter
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_schools.py)
+   - Creates schools in multiple counties (Cook, Sangamon, DuPage)
+   - Validates all 5 steps of test #27 requirements
+   - Tests ?county=Cook parameter
+
+2. **Implemented minimum code to pass test** (app/api/schools.py):
+   - Added county query parameter to schools endpoint
+   - Enhanced WHERE clause building to support multiple filters
+   - Changed from single WHERE clause to list of conditions
+   - Conditions joined with AND to support city + county combinations
+   - Maintains backward compatibility (no filters = all schools)
+
+3. **Test validates:**
+   - Endpoint returns 200 status with county filter
+   - Only schools in Cook County returned (2 schools)
+   - Schools from other counties excluded (Sangamon, DuPage)
+   - Total count reflects filtered results
+
+## Current Status
+- **27 feature tests passing** (86 total feature tests in feature_list.json)
+- **59 feature tests remaining**
+- **44 pytest tests passing** (all unit and integration tests)
+  - 17 API endpoint tests (health, auth, years, schema x2, schools x4)
+  - 1 rate limiting test
+  - 6 CLI integration tests
+  - 4 table manager tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Git Commit
+- Commit: 0cf2083
+- Message: "feat(api): add county filter to GET /schools/{year} - test #27 passing"
+- Files: 3 changed (117 insertions, 3 deletions)
+
+## Technical Notes
+- WHERE clause building now uses list of conditions for extensibility
+- Multiple filters can be combined (e.g., ?city=Chicago&county=Cook)
+- All school filters work together: pagination + field selection + city + county
+
+## Next Steps for Next Session
+
+Continue with Phase 3 (Core REST API) - School Endpoints:
+
+1. **Test #28: GET /schools/{year} filters by school type** (5 steps)
+   - Filter by type (elementary, middle, high)
+
+2. **Test #29: GET /schools/{year} supports sorting** (8 steps)
+   - Sort by various fields (enrollment, name, etc.)
+   - Support asc/desc order
+
+3. **Test #30: GET /schools/{year} enforces maximum limit** (3 steps)
+   - Cap at 1000 records
+
+4. **Test #31: GET /schools/{year} supports combining multiple filters** (8 steps)
+   - Test city + county + type combinations
+
+5. **Test #32: GET /schools/{year} returns 400 for invalid year** (4 steps)
+   - Error handling for non-existent years
+
+## Session Summary
+- **Completed 1 test this session (test #27)**
+- **Progress: 31.4% complete (27/86 tests passing)**
+- Enhanced schools endpoint with county filtering
+- Following TDD methodology strictly
+- All 44 tests passing with no regressions
+- Clean codebase ready for next session
