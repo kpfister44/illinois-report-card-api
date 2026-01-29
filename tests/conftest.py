@@ -37,6 +37,11 @@ def override_get_db():
 def setup_database():
     """Create tables before each test, drop after."""
     Base.metadata.create_all(bind=engine)
+
+    # Set up FTS5 full-text search
+    from app.services.fts5 import setup_fts5
+    setup_fts5(engine)
+
     yield
     # Drop all tables including dynamic ones
     from sqlalchemy import MetaData, inspect

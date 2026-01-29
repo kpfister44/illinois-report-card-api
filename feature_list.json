@@ -581,7 +581,7 @@
       "Step 7: Delete entity from entities_master",
       "Step 8: Verify FTS5 index removes entry"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

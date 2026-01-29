@@ -17,8 +17,12 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db():
-    """Create all database tables."""
+    """Create all database tables and FTS5 index."""
     Base.metadata.create_all(bind=engine)
+
+    # Set up FTS5 full-text search
+    from app.services.fts5 import setup_fts5
+    setup_fts5(engine)
 
 
 def get_db():
