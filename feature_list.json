@@ -363,7 +363,7 @@
       "Step 7: Send GET request with ?sort=invalid_field",
       "Step 8: Verify appropriate error response for invalid sort field"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

@@ -2,8 +2,8 @@
 # ABOUTME: Returns school data for a given year
 
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy import text, inspect
 from app.dependencies import verify_api_key, get_db
 from app.models.database import APIKey
 from app.services.table_manager import get_year_table
@@ -20,15 +20,27 @@ async def get_schools(
     city: Optional[str] = Query(default=None),
     county: Optional[str] = Query(default=None),
     type: Optional[str] = Query(default=None),
+    sort: Optional[str] = Query(default=None),
+    order: Optional[str] = Query(default="asc"),
     api_key: APIKey = Depends(verify_api_key),
     db = Depends(get_db)
 ):
-    """Returns school data for the specified year with pagination, field selection, and filtering."""
+    """Returns school data for the specified year with pagination, field selection, filtering, and sorting."""
     # Get the year-partitioned table
     table = get_year_table(year, "schools", db.bind)
 
     if table is None:
         return {"data": [], "meta": {"total": 0, "limit": limit, "offset": offset}}
+
+    # Validate sort field if provided
+    if sort:
+        inspector = inspect(db.bind)
+        table_columns = [col["name"] for col in inspector.get_columns(f"schools_{year}")]
+        if sort not in table_columns:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_PARAMETER", "message": f"Invalid sort field: {sort}"}
+            )
 
     # Parse fields parameter
     if fields:
@@ -56,13 +68,19 @@ async def get_schools(
 
     where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
+    # Build ORDER BY clause
+    order_clause = ""
+    if sort:
+        order_direction = "DESC" if order.lower() == "desc" else "ASC"
+        order_clause = f"ORDER BY {sort} {order_direction}"
+
     # Get total count with filters
     count_query = f"SELECT COUNT(*) as total FROM schools_{year} {where_clause}"
     result = db.execute(text(count_query), query_params)
     total = result.scalar()
 
-    # Get paginated data with field selection and filters
-    data_query = f"SELECT {select_clause} FROM schools_{year} {where_clause} LIMIT :limit OFFSET :offset"
+    # Get paginated data with field selection, filters, and sorting
+    data_query = f"SELECT {select_clause} FROM schools_{year} {where_clause} {order_clause} LIMIT :limit OFFSET :offset"
     result = db.execute(text(data_query), query_params)
 
     # Convert rows to dictionaries

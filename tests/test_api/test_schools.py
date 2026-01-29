@@ -541,3 +541,128 @@ def test_get_schools_filters_by_type(client):
     assert "Lincoln Elementary" not in school_names
     assert "Washington Elementary" not in school_names
     assert "Jefferson Middle School" not in school_names
+
+
+def test_get_schools_supports_sorting(client):
+    """Test #29: GET /schools/{year} supports sorting with sort and order parameters."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_sorting_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create schema for schools_2025 table
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"},
+            {"column_name": "type", "data_type": "string"}
+        ]
+
+        # Create year table
+        create_year_table(2025, "schools", schema, engine)
+
+        # Step 1: Import schools with varying enrollment numbers
+        table_name = "schools_2025"
+        schools_data = [
+            {
+                "rcdts": "01-001-0010-26-2025",
+                "school_name": "Zebra School",
+                "city": "Chicago",
+                "county": "Cook",
+                "enrollment": 300,
+                "type": "School"
+            },
+            {
+                "rcdts": "01-002-0020-26-2025",
+                "school_name": "Apple School",
+                "city": "Springfield",
+                "county": "Sangamon",
+                "enrollment": 800,
+                "type": "School"
+            },
+            {
+                "rcdts": "01-003-0030-26-2025",
+                "school_name": "Mango School",
+                "city": "Peoria",
+                "county": "Peoria",
+                "enrollment": 500,
+                "type": "School"
+            },
+            {
+                "rcdts": "01-004-0040-26-2025",
+                "school_name": "Banana School",
+                "city": "Naperville",
+                "county": "DuPage",
+                "enrollment": 1200,
+                "type": "School"
+            }
+        ]
+
+        for data in schools_data:
+            columns = ", ".join(data.keys())
+            placeholders = ", ".join([f":{k}" for k in data.keys()])
+            sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            db.execute(text(sql), data)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /schools/2025?sort=enrollment&order=desc
+    response = client.get(
+        "/schools/2025?sort=enrollment&order=desc",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify schools are ordered by enrollment descending
+    data = response.json()
+    assert "data" in data
+    assert len(data["data"]) == 4
+
+    enrollments = [school["enrollment"] for school in data["data"]]
+    assert enrollments == [1200, 800, 500, 300]  # Descending order
+    assert data["data"][0]["school_name"] == "Banana School"  # Highest enrollment
+
+    # Step 5: Send GET request with ?sort=school_name&order=asc
+    response = client.get(
+        "/schools/2025?sort=school_name&order=asc",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 6: Verify schools are ordered alphabetically by name ascending
+    assert response.status_code == 200
+    data = response.json()
+    school_names = [school["school_name"] for school in data["data"]]
+    assert school_names == ["Apple School", "Banana School", "Mango School", "Zebra School"]
+
+    # Step 7: Send GET request with ?sort=invalid_field
+    response = client.get(
+        "/schools/2025?sort=invalid_field",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 8: Verify appropriate error response for invalid sort field
+    assert response.status_code == 400
+    error_data = response.json()
+    assert "code" in error_data
+    assert error_data["code"] == "INVALID_PARAMETER"
