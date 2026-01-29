@@ -300,7 +300,7 @@
       "Step 10: Send GET request with ?limit=5&offset=5",
       "Step 11: Verify next 5 schools returned (no overlap with previous)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
