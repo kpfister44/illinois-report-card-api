@@ -555,7 +555,7 @@
       "Step 2: Verify response status code is 200",
       "Step 3: Verify only requested fields are present"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -566,7 +566,7 @@
       "Step 3: Verify error response has code INVALID_PARAMETER",
       "Step 4: Verify error message indicates available years"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
