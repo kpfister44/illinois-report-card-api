@@ -452,7 +452,7 @@
       "Step 8: Send GET request with ?limit=5&offset=0",
       "Step 9: Verify pagination works correctly"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
