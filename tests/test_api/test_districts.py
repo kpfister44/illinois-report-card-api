@@ -138,3 +138,93 @@ def test_get_districts_returns_list_with_filtering_and_pagination(client):
     assert data["meta"]["limit"] == 5
     assert data["meta"]["offset"] == 0
     assert data["meta"]["total"] == 6  # Total count is still 6
+
+
+def test_get_districts_filters_by_city(client):
+    """Test #37: GET /districts/{year} filters by city."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_districts_city_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import districts in multiple cities (Chicago, Springfield, Peoria)
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"}
+        ]
+
+        create_year_table(2025, "districts", schema, engine)
+
+        table_name = "districts_2025"
+        districts_data = [
+            {
+                "rcdts": "15-016-0000-26",
+                "district_name": "Chicago Public Schools",
+                "city": "Chicago"
+            },
+            {
+                "rcdts": "15-016-0010-26",
+                "district_name": "Chicago SD 100",
+                "city": "Chicago"
+            },
+            {
+                "rcdts": "46-062-0000-26",
+                "district_name": "Springfield SD 186",
+                "city": "Springfield"
+            },
+            {
+                "rcdts": "53-078-0000-26",
+                "district_name": "Peoria SD 150",
+                "city": "Peoria"
+            }
+        ]
+
+        for data in districts_data:
+            columns = ", ".join(data.keys())
+            placeholders = ", ".join([f":{k}" for k in data.keys()])
+            sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            db.execute(text(sql), data)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /districts/2025?city=Chicago
+    response = client.get(
+        "/districts/2025?city=Chicago",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify all returned districts have city equal to Chicago
+    data = response.json()
+    assert "data" in data
+    assert len(data["data"]) == 2  # Should have exactly 2 Chicago districts
+
+    for district in data["data"]:
+        assert district["city"] == "Chicago"
+
+    # Step 5: Verify districts from other cities are not included
+    district_names = [district["district_name"] for district in data["data"]]
+    assert "Chicago Public Schools" in district_names
+    assert "Chicago SD 100" in district_names
+    assert "Springfield SD 186" not in district_names
+    assert "Peoria SD 150" not in district_names

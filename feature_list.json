@@ -464,7 +464,7 @@
       "Step 4: Verify all returned districts have city equal to Chicago",
       "Step 5: Verify districts from other cities are not included"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
