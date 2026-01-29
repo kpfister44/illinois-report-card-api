@@ -464,3 +464,76 @@ def test_get_districts_supports_sorting(client):
     data = response.json()
     district_names = [district["district_name"] for district in data["data"]]
     assert district_names == ["Zebra District", "Mango District", "Banana District", "Apple District"]
+
+
+def test_get_district_by_rcdts_returns_single_district(client):
+    """Test #41: GET /districts/{year}/{district_id} returns single district detail."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_single_district_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import a district with known district_id
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"},
+            {"column_name": "total_enrollment", "data_type": "integer"}
+        ]
+
+        create_year_table(2025, "districts", schema, engine)
+
+        table_name = "districts_2025"
+        district_data = {
+            "rcdts": "15-016-0000-26",
+            "district_name": "Chicago Public Schools",
+            "city": "Chicago",
+            "county": "Cook",
+            "total_enrollment": 355156
+        }
+
+        columns = ", ".join(district_data.keys())
+        placeholders = ", ".join([f":{k}" for k in district_data.keys()])
+        sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        db.execute(text(sql), district_data)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /districts/2025/{district_id}
+    response = client.get(
+        "/districts/2025/15-016-0000-26",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify response has data object with district details
+    data = response.json()
+    assert "data" in data
+    assert isinstance(data["data"], dict)
+
+    # Step 5: Verify all district-level fields are included
+    district = data["data"]
+    assert district["rcdts"] == "15-016-0000-26"
+    assert district["district_name"] == "Chicago Public Schools"
+    assert district["city"] == "Chicago"
+    assert district["county"] == "Cook"
+    assert district["total_enrollment"] == 355156

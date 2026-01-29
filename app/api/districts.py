@@ -109,3 +109,70 @@ async def get_districts(
         "data": data,
         "meta": meta
     }
+
+
+@router.get("/districts/{year}/{rcdts}")
+async def get_district_by_rcdts(
+    year: int,
+    rcdts: str,
+    fields: Optional[str] = Query(default=None),
+    api_key: APIKey = Depends(verify_api_key),
+    db = Depends(get_db)
+):
+    """Returns a single district by RCDTS code for the specified year."""
+    # Get the year-partitioned table
+    table = get_year_table(year, "districts", db.bind)
+
+    if table is None:
+        # Get available years to include in error message
+        available_years = get_available_years("districts", db.bind)
+        if available_years:
+            years_str = ", ".join(str(y) for y in available_years)
+            message = f"No data available for year {year}. Available years: {years_str}"
+        else:
+            message = f"No data available for year {year}. No district data has been imported yet."
+
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PARAMETER", "message": message}
+        )
+
+    # Parse fields parameter
+    if fields:
+        field_list = [f.strip() for f in fields.split(",")]
+        select_clause = ", ".join(field_list)
+    else:
+        select_clause = "*"
+        field_list = None
+
+    # Query for the district by RCDTS
+    query = f"SELECT {select_clause} FROM districts_{year} WHERE rcdts = :rcdts"
+    result = db.execute(text(query), {"rcdts": rcdts})
+
+    # Get the district record
+    row = result.fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NOT_FOUND", "message": f"District with RCDTS {rcdts} not found for year {year}"}
+        )
+
+    # Convert row to dictionary
+    columns = result.keys()
+    district_data = dict(zip(columns, row))
+
+    # Build meta response
+    meta = {
+        "year": year,
+        "rcdts": rcdts
+    }
+
+    # Add fields_returned if field selection was used
+    if field_list:
+        meta["fields_returned"] = len(field_list)
+
+    return {
+        "data": district_data,
+        "meta": meta
+    }

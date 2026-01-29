@@ -523,7 +523,7 @@
       "Step 4: Verify response has data object with district details",
       "Step 5: Verify all district-level fields are included"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
