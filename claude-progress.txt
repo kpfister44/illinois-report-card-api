@@ -1586,3 +1586,22 @@ Continue with Phase 3 (Core REST API) - School Endpoints:
    - GET /districts/{year}/{rcdts} for single district
 
 After schools and districts endpoints complete, move to state endpoint and search functionality.
+
+## Mid-Session Update
+
+### Tests #31-35 Completed
+✅ Test #31: Combining multiple filters (city + county + type)
+✅ Test #32: Invalid year returns 400 error
+✅ Test #33: GET /schools/{year}/{rcdts} returns single school
+✅ Test #34: Single school endpoint supports field selection  
+✅ Test #35: Single school endpoint returns 404 for non-existent RCDTS
+
+**Current Status: 35/86 tests passing (40.7% complete)**
+
+Key implementations:
+- Added get_available_years() function to table_manager
+- Enhanced error handling with helpful messages (includes available years)
+- Implemented GET /schools/{year}/{rcdts} endpoint with field selection
+- All error codes follow API spec (INVALID_PARAMETER, NOT_FOUND)
+
+All 12 schools endpoint tests passing with no regressions.
