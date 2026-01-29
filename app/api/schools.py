@@ -17,10 +17,11 @@ async def get_schools(
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     fields: Optional[str] = Query(default=None),
+    city: Optional[str] = Query(default=None),
     api_key: APIKey = Depends(verify_api_key),
     db = Depends(get_db)
 ):
-    """Returns school data for the specified year with pagination and optional field selection."""
+    """Returns school data for the specified year with pagination, field selection, and filtering."""
     # Get the year-partitioned table
     table = get_year_table(year, "schools", db.bind)
 
@@ -35,14 +36,22 @@ async def get_schools(
         select_clause = "*"
         field_list = None
 
-    # Get total count
-    count_query = f"SELECT COUNT(*) as total FROM schools_{year}"
-    result = db.execute(text(count_query))
+    # Build WHERE clause for filters
+    where_clause = ""
+    query_params = {"limit": limit, "offset": offset}
+
+    if city:
+        where_clause = "WHERE city = :city"
+        query_params["city"] = city
+
+    # Get total count with filters
+    count_query = f"SELECT COUNT(*) as total FROM schools_{year} {where_clause}"
+    result = db.execute(text(count_query), query_params)
     total = result.scalar()
 
-    # Get paginated data with field selection
-    data_query = f"SELECT {select_clause} FROM schools_{year} LIMIT :limit OFFSET :offset"
-    result = db.execute(text(data_query), {"limit": limit, "offset": offset})
+    # Get paginated data with field selection and filters
+    data_query = f"SELECT {select_clause} FROM schools_{year} {where_clause} LIMIT :limit OFFSET :offset"
+    result = db.execute(text(data_query), query_params)
 
     # Convert rows to dictionaries
     rows = result.fetchall()

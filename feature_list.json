@@ -324,7 +324,7 @@
       "Step 4: Verify all returned schools have city equal to Chicago",
       "Step 5: Verify schools from other cities are not included"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
