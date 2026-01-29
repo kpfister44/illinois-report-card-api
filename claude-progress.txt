@@ -1364,10 +1364,115 @@ Continue with Phase 3 (Core REST API) - School Endpoints:
 5. **Test #32: GET /schools/{year} returns 400 for invalid year** (4 steps)
    - Error handling for non-existent years
 
+### Test #28: GET /schools/{year} with Type Filter
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_schools.py)
+   - Creates schools of different types (elementary, middle, high)
+   - Validates all 5 steps of test #28 requirements
+   - Tests ?type=high parameter
+
+2. **Implemented minimum code to pass test** (app/api/schools.py):
+   - Added type query parameter to schools endpoint
+   - Added type condition to WHERE clause builder
+   - Works seamlessly with existing filters (city, county)
+   - Maintains backward compatibility
+
+3. **Test validates:**
+   - Endpoint returns 200 status with type filter
+   - Only high schools returned (2 schools)
+   - Elementary and middle schools excluded
+   - Total count reflects filtered results
+
+## Session 8 Updated Status
+- **28 feature tests passing** (86 total feature tests in feature_list.json)
+- **58 feature tests remaining**
+- **45 pytest tests passing** (all unit and integration tests)
+  - 18 API endpoint tests (health, auth, years, schema x2, schools x5)
+  - 1 rate limiting test
+  - 6 CLI integration tests
+  - 4 table manager tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Git Commit (Test #28)
+- Commit: 7fe3cdd
+- Message: "feat(api): add type filter to GET /schools/{year} - test #28 passing"
+- Files: 3 changed (122 insertions, 1 deletion)
+
+### Test #29: GET /schools/{year} with Sorting Support
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_schools.py)
+   - Creates schools with varying enrollments and names
+   - Validates all 8 steps of test #29 requirements
+   - Tests sort by enrollment (desc), sort by name (asc)
+   - Tests error handling for invalid sort fields
+
+2. **Implemented minimum code to pass test** (app/api/schools.py):
+   - Added sort and order query parameters
+   - Validates sort field exists in table schema using SQLAlchemy inspector
+   - Returns 400 with INVALID_PARAMETER for invalid sort fields
+   - Built ORDER BY clause with ASC/DESC support
+   - Default order is ascending
+   - Maintains backward compatibility (no sort = no ordering)
+
+3. **Test validates:**
+   - Endpoint returns 200 status with sorting
+   - Schools ordered correctly by enrollment descending [1200, 800, 500, 300]
+   - Schools ordered correctly by name ascending [Apple, Banana, Mango, Zebra]
+   - Invalid sort field returns 400 error with code INVALID_PARAMETER
+
+## Session 8 Final Status
+- **29 feature tests passing** (86 total feature tests in feature_list.json)
+- **57 feature tests remaining**
+- **46 pytest tests passing** (all unit and integration tests)
+  - 19 API endpoint tests (health, auth, years, schema x2, schools x6)
+  - 1 rate limiting test
+  - 6 CLI integration tests
+  - 4 table manager tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Git Commits This Session
+- Commit 0cf2083: Test #27 (County filter)
+- Commit b41715b: Progress notes update
+- Commit 7fe3cdd: Test #28 (Type filter)
+- Commit b6fa174: Test #29 (Sorting)
+
 ## Session Summary
-- **Completed 1 test this session (test #27)**
-- **Progress: 31.4% complete (27/86 tests passing)**
-- Enhanced schools endpoint with county filtering
-- Following TDD methodology strictly
-- All 44 tests passing with no regressions
+- **Completed 3 tests this session (tests #27, #28, #29)**
+- **Progress: 33.7% complete (29/86 tests passing)**
+- Enhanced schools endpoint with comprehensive filtering and sorting:
+  - Filters: city, county, type (all combinable with AND logic)
+  - Sorting: any field, ascending or descending
+  - Field selection: comma-separated field list
+  - Pagination: limit and offset
+  - Error handling: 400 for invalid sort fields
+- All features work together seamlessly
+- Following TDD methodology strictly throughout
+- All 46 tests passing with no regressions
 - Clean codebase ready for next session
+
+## Next Steps for Next Session
+
+Continue with Phase 3 (Core REST API) - School Endpoints:
+
+1. **Test #30: GET /schools/{year} enforces maximum limit** (3 steps)
+   - Cap at 1000 records max
+
+2. **Test #31: GET /schools/{year} supports combining multiple filters** (8 steps)
+   - Test city + county + type combinations
+
+3. **Test #32: GET /schools/{year} returns 400 for invalid year** (4 steps)
+   - Error handling for non-existent years
+
+4. **Test #33: GET /schools/{year}/{rcdts} returns single school** (7 steps)
+   - Detail endpoint for individual schools
+
+5. **Test #34-35: Single school endpoint features**
+   - Field selection and error handling
+
+After schools endpoints complete, move to districts and state endpoints.
