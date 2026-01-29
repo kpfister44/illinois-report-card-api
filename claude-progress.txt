@@ -2112,3 +2112,98 @@ Key implementation:
 
 All code committed cleanly. Ready for next session.
 
+
+---
+
+# Session 11 Continued - Test #49 Complete
+
+## Planning Phase
+Used EnterPlanMode to design implementation approach for year filtering:
+- Explored entity-year architecture
+- Analyzed 4 implementation options
+- Chose Option D: Post-filter after FTS5 search
+- Created comprehensive implementation plan
+
+### Test #49 Completed
+✅ Test #49: GET /search filters by year
+
+**Final Status: 49/86 tests passing (57.0% complete)**
+
+Key implementation:
+- Added optional `year` parameter to /search endpoint
+- Validates year against available years from year-partitioned tables
+- Post-filters FTS5 results by checking if RCDTS exists in `{entity_type}s_{year}` table
+- Returns 400 error for invalid years with helpful message
+- Follows same validation pattern as /schools/{year} and /districts/{year}
+
+Technical approach:
+- FTS5 search returns all matching entities (year-agnostic)
+- For each result, queries `schools_{year}`, `districts_{year}`, etc. to check existence
+- Entity table mapping handles pluralization (school→schools, district→districts, state→state)
+- Gracefully handles missing tables for entity type + year combinations
+
+## Session 11 Final Summary
+
+### Tests Completed
+- Test #47: GET /search with FTS5 full-text search
+- Test #48: GET /search with entity type filter
+- Test #49: GET /search with year filter
+
+### Progress
+- Started: 46/86 (53.5%)
+- Ended: 49/86 (57.0%)
+- Gain: +3.5% (3 tests completed)
+
+### Session Workflow
+1. Implemented tests #47-48 directly (straightforward features)
+2. Entered plan mode for test #49 (complex architectural decision)
+3. Explored codebase architecture with Explore agent
+4. Designed approach with Plan agent
+5. Got plan approval from Kyle
+6. Implemented test #49 following approved plan
+7. All tests passing, clean git state
+
+### Technical Achievements
+- Full-text search working with FTS5 virtual table
+- Entity type filtering integrated
+- Year filtering using post-FTS5 approach
+- No schema changes needed
+- All 66 tests passing with no regressions
+- Clean, maintainable code following TDD
+- Comprehensive planning for complex features
+
+### Git Commits This Session
+- e3424dd: Test #47 (FTS5 search endpoint)
+- 3c95557: Progress notes (test #47)
+- 07fd10a: Test #48 (entity type filter)  
+- 6a2b455: Session 11 mid-session summary
+- c00734f: Test #49 (year filter)
+
+### Session Statistics
+- **Tests completed: 3** (#47-49)
+- **Progress gain: +3.5%** (53.5% → 57.0%)
+- **Planning: Yes** (used EnterPlanMode for test #49)
+- **Total commits: 5**
+- **Context used: ~117k/200k tokens**
+
+### Next Steps for Next Session
+
+Continue with Phase 3 (Core REST API) - Remaining Search Features:
+
+1. **Test #50: GET /search respects limit parameter with max 50** (3 steps)
+   - Pagination support for search results
+   - Default limit and maximum enforcement
+
+2. **Test #51: GET /search handles special characters and query sanitization** (5 steps)
+   - Protect against FTS5 syntax errors
+   - Sanitize user input for safe querying
+
+3. **Test #52: GET /search requires minimum query length** (3 steps)
+   - Validation for query parameter
+   - Return 400 for empty or too-short queries
+
+4. **Test #53: GET /search returns results ranked by relevance** (4 steps)
+   - Verify FTS5 relevance ranking is working correctly
+
+After search functionality complete, move to POST /query flexible endpoint and remaining features.
+
