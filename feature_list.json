@@ -533,7 +533,7 @@
       "Step 2: Verify response status code is 404",
       "Step 3: Verify error response has code NOT_FOUND"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

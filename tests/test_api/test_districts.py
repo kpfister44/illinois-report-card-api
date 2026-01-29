@@ -537,3 +537,52 @@ def test_get_district_by_rcdts_returns_single_district(client):
     assert district["city"] == "Chicago"
     assert district["county"] == "Cook"
     assert district["total_enrollment"] == 355156
+
+
+def test_get_district_by_rcdts_returns_404_for_nonexistent_district(client):
+    """Test #42: GET /districts/{year}/{district_id} returns 404 for non-existent district."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_district_404_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create year table (but don't insert the district we'll query for)
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district_name", "data_type": "string"}
+        ]
+
+        create_year_table(2025, "districts", schema, engine)
+
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request to /districts/2025/nonexistent-id
+    response = client.get(
+        "/districts/2025/nonexistent-id",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response status code is 404
+    assert response.status_code == 404
+
+    # Step 3: Verify error response has code NOT_FOUND
+    data = response.json()
+    assert "code" in data
+    assert data["code"] == "NOT_FOUND"
+    assert "message" in data
+    assert "nonexistent-id" in data["message"]
