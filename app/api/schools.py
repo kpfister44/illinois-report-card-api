@@ -19,6 +19,7 @@ async def get_schools(
     fields: Optional[str] = Query(default=None),
     city: Optional[str] = Query(default=None),
     county: Optional[str] = Query(default=None),
+    type: Optional[str] = Query(default=None),
     api_key: APIKey = Depends(verify_api_key),
     db = Depends(get_db)
 ):
@@ -48,6 +49,10 @@ async def get_schools(
     if county:
         where_conditions.append("county = :county")
         query_params["county"] = county
+
+    if type:
+        where_conditions.append("type = :type")
+        query_params["type"] = type
 
     where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 

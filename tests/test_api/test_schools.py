@@ -425,3 +425,119 @@ def test_get_schools_filters_by_county(client):
     assert "Cook County School 2" in school_names
     assert "Sangamon County School 1" not in school_names
     assert "DuPage County School 1" not in school_names
+
+
+def test_get_schools_filters_by_type(client):
+    """Test #28: GET /schools/{year} filters by school type."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_type_filter_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create schema for schools_2025 table
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"},
+            {"column_name": "type", "data_type": "string"}
+        ]
+
+        # Create year table
+        create_year_table(2025, "schools", schema, engine)
+
+        # Step 1: Import schools of different types (elementary, middle, high)
+        table_name = "schools_2025"
+        schools_data = [
+            {
+                "rcdts": "01-001-0010-26-2025",
+                "school_name": "Lincoln Elementary",
+                "city": "Chicago",
+                "county": "Cook",
+                "enrollment": 400,
+                "type": "elementary"
+            },
+            {
+                "rcdts": "01-002-0020-26-2025",
+                "school_name": "Washington Elementary",
+                "city": "Springfield",
+                "county": "Sangamon",
+                "enrollment": 350,
+                "type": "elementary"
+            },
+            {
+                "rcdts": "01-003-0030-26-2025",
+                "school_name": "Jefferson Middle School",
+                "city": "Chicago",
+                "county": "Cook",
+                "enrollment": 600,
+                "type": "middle"
+            },
+            {
+                "rcdts": "01-004-0040-26-2025",
+                "school_name": "Roosevelt High School",
+                "city": "Chicago",
+                "county": "Cook",
+                "enrollment": 1200,
+                "type": "high"
+            },
+            {
+                "rcdts": "01-005-0050-26-2025",
+                "school_name": "Kennedy High School",
+                "city": "Springfield",
+                "county": "Sangamon",
+                "enrollment": 1100,
+                "type": "high"
+            }
+        ]
+
+        for data in schools_data:
+            columns = ", ".join(data.keys())
+            placeholders = ", ".join([f":{k}" for k in data.keys()])
+            sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            db.execute(text(sql), data)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /schools/2025?type=high
+    response = client.get(
+        "/schools/2025?type=high",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify all returned schools are high schools
+    data = response.json()
+    assert "data" in data
+    assert len(data["data"]) == 2  # Should have exactly 2 high schools
+
+    for school in data["data"]:
+        assert school["type"] == "high"
+
+    # Step 5: Verify elementary and middle schools are not included
+    school_names = [school["school_name"] for school in data["data"]]
+    assert "Roosevelt High School" in school_names
+    assert "Kennedy High School" in school_names
+    assert "Lincoln Elementary" not in school_names
+    assert "Washington Elementary" not in school_names
+    assert "Jefferson Middle School" not in school_names

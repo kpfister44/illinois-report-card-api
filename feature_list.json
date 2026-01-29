@@ -348,7 +348,7 @@
       "Step 4: Verify all returned schools are high schools",
       "Step 5: Verify elementary and middle schools are not included"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
