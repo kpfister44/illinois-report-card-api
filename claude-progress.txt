@@ -1186,3 +1186,52 @@ Continue with Phase 3 (Core REST API) - School Endpoints:
 - Following TDD methodology strictly
 - All 41 tests passing with no regressions
 - Clean codebase ready for next session
+
+### Test #25: GET /schools/{year} with Field Selection
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_schools.py)
+   - Tests ?fields=rcdts,school_name,city parameter
+   - Validates only requested fields are returned
+   - Verifies meta.fields_returned count
+
+2. **Implemented minimum code to pass test** (app/api/schools.py):
+   - Added optional fields query parameter
+   - Parse comma-separated field list
+   - Modify SELECT clause to specify fields instead of *
+   - Add fields_returned to meta when fields specified
+   - Maintains backward compatibility (no fields = all fields)
+
+3. **Test validates:**
+   - Endpoint returns 200 status with field selection
+   - Response contains only requested fields (rcdts, school_name, city)
+   - Unwanted fields (county, enrollment, type) not present
+   - Exactly 3 fields returned as requested
+   - Meta.fields_returned = 3
+
+## Session 7 Updated Status
+- **25 feature tests passing** (86 total feature tests in feature_list.json)
+- **61 feature tests remaining**
+- **42 pytest tests passing** (all unit and integration tests)
+  - 15 API endpoint tests (health, auth, years, schema x2, schools x2)
+  - 1 rate limiting test
+  - 6 CLI integration tests
+  - 4 table manager tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Additional Git Commit (Test #25)
+- Commit: fea8e4c
+- Message: "feat(api): add field selection support to GET /schools/{year} - test #25 passing"
+- Files: 3 changed (113 insertions, 9 deletions)
+
+## Session 7 Progress Summary
+- **Completed 2 tests this session (tests #24, #25)**
+- **Progress: 29.1% complete (25/86 tests passing)**
+- Implemented schools endpoint with:
+  - Pagination (limit/offset)
+  - Field selection (comma-separated fields parameter)
+- Both features work together seamlessly
+- All 42 tests passing with no regressions
+- Clean codebase ready for next test
