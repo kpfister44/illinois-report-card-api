@@ -997,3 +997,50 @@ Continue with Phase 3 (Core REST API) - Schema Endpoints:
 - Fixed critical test isolation bug that will prevent future issues
 - All tests remain passing
 - API endpoints starting to take shape - /health, /years complete
+
+### Test #22: GET /schema/{year} Endpoint Implementation
+Following TDD methodology:
+
+1. **Wrote failing test** (tests/test_api/test_schema.py)
+   - Creates year table with schema_metadata populated
+   - Validates all 7 steps of test #22 requirements
+   - Tests all metadata fields including is_suppressed_indicator
+
+2. **Implemented minimum code to pass test** (app/api/schema.py):
+   - Query schema_metadata table for given year
+   - Return array of column metadata objects
+   - Include all required fields: column_name, data_type, category, description
+   - Include source_column_name and is_suppressed_indicator
+   - Return 404 if no metadata found for year
+
+3. **Test validates:**
+   - Endpoint returns 200 status with valid API key
+   - Response contains array of metadata objects (5 columns)
+   - Each object has all required fields
+   - Source column names preserved from Excel
+   - Suppression indicator flag correctly set
+
+## Final Session Status
+- **22 feature tests passing** (86 total feature tests in feature_list.json)
+- **64 feature tests remaining**
+- **39 pytest tests passing** (all unit and integration tests)
+  - 12 API endpoint tests (health, auth, years, schema)
+  - 1 rate limiting test
+  - 6 CLI integration tests
+  - 4 table manager tests
+  - 4 data cleaner tests
+  - 3 Excel parser tests
+  - 10 schema detector tests
+
+## Additional Git Commit
+- Commit: 0c950be
+- Message: "feat(api): implement GET /schema/{year} endpoint - test #22 passing"
+- Files: 4 changed (189 insertions, 2 deletions)
+
+## Session Summary
+- Completed 2 tests this session (tests #21, #22)
+- Fixed critical test isolation bug in conftest.py
+- Implemented two foundational API endpoints: /years and /schema/{year}
+- Following TDD strictly throughout
+- All tests passing with no regressions
+- Clean code base ready for next session
