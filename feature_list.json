@@ -312,7 +312,7 @@
       "Step 4: Verify no other fields are present in the response",
       "Step 5: Verify meta.fields_returned reflects the count of selected fields"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

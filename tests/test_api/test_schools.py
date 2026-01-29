@@ -124,3 +124,90 @@ def test_get_schools_returns_list_with_pagination(client):
     # Verify no overlap with first 5 schools
     second_five_ids = [school["id"] for school in data["data"]]
     assert len(set(first_five_ids) & set(second_five_ids)) == 0
+
+
+def test_get_schools_supports_field_selection(client):
+    """Test #25: GET /schools/{year} supports field selection via fields parameter."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_fields_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create schema for schools_2025 table with multiple fields
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"},
+            {"column_name": "type", "data_type": "string"}
+        ]
+
+        # Create year table
+        create_year_table(2025, "schools", schema, engine)
+
+        # Insert test school
+        table_name = "schools_2025"
+        data = {
+            "rcdts": "01-001-0010-26-2025",
+            "school_name": "Test School",
+            "city": "Springfield",
+            "county": "Sangamon",
+            "enrollment": 450,
+            "type": "School"
+        }
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join([f":{k}" for k in data.keys()])
+        sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        db.execute(text(sql), data)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request to /schools/2025?fields=rcdts,name,city
+    response = client.get(
+        "/schools/2025?fields=rcdts,school_name,city",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 3: Verify each school object only contains rcdts, name, and city fields
+    data = response.json()
+    assert "data" in data
+    assert len(data["data"]) > 0
+
+    first_school = data["data"][0]
+    assert "rcdts" in first_school
+    assert "school_name" in first_school
+    assert "city" in first_school
+
+    # Step 4: Verify no other fields are present in the response
+    # Should not have id, county, enrollment, type, or imported_at
+    assert "county" not in first_school
+    assert "enrollment" not in first_school
+    assert "type" not in first_school
+
+    # Verify exactly 3 fields (the ones we requested)
+    assert len(first_school.keys()) == 3
+
+    # Step 5: Verify meta.fields_returned reflects the count of selected fields
+    assert "meta" in data
+    assert "fields_returned" in data["meta"]
+    assert data["meta"]["fields_returned"] == 3
