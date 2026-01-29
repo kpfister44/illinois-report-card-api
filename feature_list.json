@@ -595,7 +595,7 @@
       "Step 6: Verify each result has rcdts, name, city, entity_type",
       "Step 7: Verify meta.total reflects actual match count"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
