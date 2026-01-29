@@ -228,3 +228,239 @@ def test_get_districts_filters_by_city(client):
     assert "Chicago SD 100" in district_names
     assert "Springfield SD 186" not in district_names
     assert "Peoria SD 150" not in district_names
+
+
+def test_get_districts_filters_by_county(client):
+    """Test #38: GET /districts/{year} filters by county."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_districts_county_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import districts in multiple counties
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district_name", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"}
+        ]
+
+        create_year_table(2025, "districts", schema, engine)
+
+        table_name = "districts_2025"
+        districts_data = [
+            {
+                "rcdts": "15-016-0000-26",
+                "district_name": "Chicago Public Schools",
+                "county": "Cook"
+            },
+            {
+                "rcdts": "15-016-0010-26",
+                "district_name": "Evanston SD 65",
+                "county": "Cook"
+            },
+            {
+                "rcdts": "46-062-0000-26",
+                "district_name": "Springfield SD 186",
+                "county": "Sangamon"
+            },
+            {
+                "rcdts": "53-078-0000-26",
+                "district_name": "Peoria SD 150",
+                "county": "Peoria"
+            }
+        ]
+
+        for data in districts_data:
+            columns = ", ".join(data.keys())
+            placeholders = ", ".join([f":{k}" for k in data.keys()])
+            sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            db.execute(text(sql), data)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /districts/2025?county=Cook
+    response = client.get(
+        "/districts/2025?county=Cook",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify all returned districts have county equal to Cook
+    data = response.json()
+    assert len(data["data"]) == 2
+
+    for district in data["data"]:
+        assert district["county"] == "Cook"
+
+    # Step 5: Verify districts from other counties are not included
+    district_names = [district["district_name"] for district in data["data"]]
+    assert "Chicago Public Schools" in district_names
+    assert "Evanston SD 65" in district_names
+    assert "Springfield SD 186" not in district_names
+    assert "Peoria SD 150" not in district_names
+
+
+def test_get_districts_supports_field_selection(client):
+    """Test #39: GET /districts/{year} supports field selection."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_districts_fields_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"}
+        ]
+
+        create_year_table(2025, "districts", schema, engine)
+
+        table_name = "districts_2025"
+        data = {
+            "rcdts": "15-016-0000-26",
+            "district_name": "Chicago Public Schools",
+            "city": "Chicago",
+            "county": "Cook"
+        }
+
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join([f":{k}" for k in data.keys()])
+        sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        db.execute(text(sql), data)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request with fields parameter
+    response = client.get(
+        "/districts/2025?fields=rcdts,district_name,city",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 3: Verify each district object only contains requested fields
+    data = response.json()
+    assert len(data["data"]) > 0
+
+    first_district = data["data"][0]
+    assert "rcdts" in first_district
+    assert "district_name" in first_district
+    assert "city" in first_district
+
+    # Step 4: Verify no other fields are present in the response
+    assert "county" not in first_district
+    assert "id" not in first_district
+    assert "imported_at" not in first_district
+    assert len(first_district.keys()) == 3
+
+
+def test_get_districts_supports_sorting(client):
+    """Test #40: GET /districts/{year} supports sorting."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_districts_sorting_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import districts with varying data
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district_name", "data_type": "string"}
+        ]
+
+        create_year_table(2025, "districts", schema, engine)
+
+        table_name = "districts_2025"
+        districts_data = [
+            {"rcdts": "01-001-0000-26", "district_name": "Zebra District"},
+            {"rcdts": "01-002-0000-26", "district_name": "Apple District"},
+            {"rcdts": "01-003-0000-26", "district_name": "Mango District"},
+            {"rcdts": "01-004-0000-26", "district_name": "Banana District"}
+        ]
+
+        for data in districts_data:
+            columns = ", ".join(data.keys())
+            placeholders = ", ".join([f":{k}" for k in data.keys()])
+            sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            db.execute(text(sql), data)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request with sort=district_name&order=asc
+    response = client.get(
+        "/districts/2025?sort=district_name&order=asc",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify response status code is 200
+    assert response.status_code == 200
+
+    # Step 4: Verify districts are ordered alphabetically by name ascending
+    data = response.json()
+    district_names = [district["district_name"] for district in data["data"]]
+    assert district_names == ["Apple District", "Banana District", "Mango District", "Zebra District"]
+
+    # Step 5: Send GET request with ?sort=district_name&order=desc
+    response = client.get(
+        "/districts/2025?sort=district_name&order=desc",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 6: Verify districts are ordered alphabetically descending
+    assert response.status_code == 200
+    data = response.json()
+    district_names = [district["district_name"] for district in data["data"]]
+    assert district_names == ["Zebra District", "Mango District", "Banana District", "Apple District"]
