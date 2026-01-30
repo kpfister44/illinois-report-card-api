@@ -2469,3 +2469,53 @@ Continue with remaining search features:
 - **Status: 53/86 tests passing (61.6%)**
 - **All search tests: 6/6 passing**
 
+
+---
+
+## Session 13 Update - Test #53 Complete
+
+### Test #53: GET /search returns results ranked by relevance ✅
+
+**Test Implementation:**
+- Added test_get_search_returns_results_ranked_by_relevance
+- Created entities with search term at different positions:
+  - "Lincoln Elementary School" (term at start)
+  - "Abraham Lincoln High" (term in middle)
+  - "Lincoln Park Academy" (term at start)
+- Validated all 4 steps:
+  1. Import schools with varied name patterns
+  2. Search for "Lincoln"
+  3. Verify all results returned
+  4. Verify relevance ranking (earlier position ranks higher)
+
+**TDD Process:**
+1. Wrote test first
+2. Test PASSED immediately
+3. This is **existing functionality** - not new code
+
+**Implementation Details:**
+- Feature already implemented via `ORDER BY rank` in FTS5 queries (line 96-97, 106-107)
+- FTS5 automatically provides relevance ranking via `rank` column
+- Ranks results by BM25 algorithm (term frequency, position, document length)
+- Test validates this ranking works as expected
+
+**Finding:**
+- The ORDER BY rank was implemented in an earlier session (test #47)
+- This test adds validation that ranking works correctly
+- No code changes needed - test documents existing behavior
+
+## Progress Update
+- **Tests completed: 3** (#51 special chars, #52 validation, #53 relevance)
+- **Status: 54/86 tests passing (62.8%)**
+- **All search tests: 7/7 passing (100%)**
+
+## Search Endpoint Complete
+All search functionality is now complete and tested:
+✅ Full-text search across entities (test #47)
+✅ Entity type filtering (test #48)
+✅ Year filtering (test #49)
+✅ Limit parameter with max 50 (test #50)
+✅ Special character sanitization (test #51)
+✅ Query validation (test #52)
+✅ Relevance ranking (test #53)
+
