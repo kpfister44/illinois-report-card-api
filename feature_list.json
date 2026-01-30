@@ -717,7 +717,7 @@
       "Step 3: Verify only schools in Chicago or Springfield returned",
       "Step 4: Verify Peoria schools are excluded"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

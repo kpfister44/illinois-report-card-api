@@ -65,23 +65,36 @@ async def query(
         for field, value in request.filters.items():
             # Check if value is a dict with comparison operators
             if isinstance(value, dict):
-                # Handle comparison operators: gte, lte, gt, lt
+                # Handle comparison operators: gte, lte, gt, lt, in
                 for operator, op_value in value.items():
-                    param_name = f"filter_{param_counter}"
-                    param_counter += 1
+                    if operator == "in":
+                        # Handle IN operator with list of values
+                        if not isinstance(op_value, list):
+                            continue
+                        # Build placeholders for each value in the list
+                        placeholders = []
+                        for item in op_value:
+                            param_name = f"filter_{param_counter}"
+                            param_counter += 1
+                            placeholders.append(f":{param_name}")
+                            query_params[param_name] = item
+                        where_conditions.append(f"{field} IN ({', '.join(placeholders)})")
+                    else:
+                        param_name = f"filter_{param_counter}"
+                        param_counter += 1
 
-                    if operator == "gte":
-                        where_conditions.append(f"{field} >= :{param_name}")
-                        query_params[param_name] = op_value
-                    elif operator == "lte":
-                        where_conditions.append(f"{field} <= :{param_name}")
-                        query_params[param_name] = op_value
-                    elif operator == "gt":
-                        where_conditions.append(f"{field} > :{param_name}")
-                        query_params[param_name] = op_value
-                    elif operator == "lt":
-                        where_conditions.append(f"{field} < :{param_name}")
-                        query_params[param_name] = op_value
+                        if operator == "gte":
+                            where_conditions.append(f"{field} >= :{param_name}")
+                            query_params[param_name] = op_value
+                        elif operator == "lte":
+                            where_conditions.append(f"{field} <= :{param_name}")
+                            query_params[param_name] = op_value
+                        elif operator == "gt":
+                            where_conditions.append(f"{field} > :{param_name}")
+                            query_params[param_name] = op_value
+                        elif operator == "lt":
+                            where_conditions.append(f"{field} < :{param_name}")
+                            query_params[param_name] = op_value
             else:
                 # Simple equality filter
                 where_conditions.append(f"{field} = :{field}")

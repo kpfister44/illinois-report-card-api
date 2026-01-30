@@ -278,3 +278,81 @@ def test_post_query_supports_comparison_operators(client):
     enrollments = [r["enrollment"] for r in results]
     assert all(500 <= e <= 1500 for e in enrollments), f"All enrollments should be 500-1500, got {enrollments}"
     assert set(enrollments) == {500, 1000}, f"Expected enrollments [500, 1000], got {enrollments}"
+
+
+def test_post_query_supports_in_operator(client):
+    """Test #57: POST /query supports IN operator for multiple values."""
+    from tests.conftest import TestingSessionLocal, engine
+    from sqlalchemy import text
+    from app.services.table_manager import create_year_table
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_query_in_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import schools in Chicago, Springfield, and Peoria
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"}
+        ]
+        create_year_table(2025, "schools", schema, engine)
+
+        # Insert test data with schools in different cities
+        insert_query = text("""
+            INSERT INTO schools_2025 (rcdts, school_name, city)
+            VALUES
+                ('15-016-0001-17-0001', 'Chicago School 1', 'Chicago'),
+                ('15-016-0002-17-0002', 'Chicago School 2', 'Chicago'),
+                ('05-016-0003-17-0003', 'Springfield School 1', 'Springfield'),
+                ('05-016-0004-17-0004', 'Springfield School 2', 'Springfield'),
+                ('19-016-0005-17-0005', 'Peoria School 1', 'Peoria'),
+                ('19-016-0006-17-0006', 'Peoria School 2', 'Peoria')
+        """)
+        db.execute(insert_query)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send POST to /query with filters: {"city": {"in": ["Chicago", "Springfield"]}}
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "filters": {"city": {"in": ["Chicago", "Springfield"]}}
+        }
+    )
+
+    # Step 3: Verify only schools in Chicago or Springfield returned
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    results = data["data"]
+
+    assert len(results) == 4, f"Expected 4 schools (Chicago + Springfield), got {len(results)}"
+
+    cities = [r["city"] for r in results]
+    assert all(c in ["Chicago", "Springfield"] for c in cities), f"All cities should be Chicago or Springfield, got {cities}"
+
+    # Step 4: Verify Peoria schools are excluded
+    assert "Peoria" not in cities, "Peoria schools should be excluded"
+
+    # Verify we got both Chicago and Springfield schools
+    assert "Chicago" in cities, "Should have Chicago schools"
+    assert "Springfield" in cities, "Should have Springfield schools"
