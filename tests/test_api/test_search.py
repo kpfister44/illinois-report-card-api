@@ -400,3 +400,96 @@ def test_get_search_respects_limit_parameter_with_max_50(client):
     data = response.json()
     assert len(data["data"]) == 50  # Should be capped at 50
     assert data["meta"]["limit"] == 50  # Should show effective limit
+
+
+def test_get_search_handles_special_characters_and_sanitization(client):
+    """Test #52: GET /search handles special characters and query sanitization."""
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_search_sanitize_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+
+        # Add entities with special characters
+        entities = [
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0001",
+                entity_type="school",
+                name="O'Brien Elementary",
+                city="Springfield",
+                county="Sangamon"
+            ),
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0002",
+                entity_type="school",
+                name="St. Mary's School",
+                city="Chicago",
+                county="Cook"
+            ),
+            EntitiesMaster(
+                rcdts="05-016-2140-17-0003",
+                entity_type="school",
+                name="Test--Injection School",
+                city="Naperville",
+                county="DuPage"
+            )
+        ]
+
+        for entity in entities:
+            db.add(entity)
+
+        db.commit()
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request to /search?q=O'Brien
+    response = client.get(
+        "/search?q=O'Brien",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response does not error (proper escaping)
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    # Should find O'Brien Elementary
+    results = data["data"]
+    obrien_schools = [r for r in results if "O'Brien" in r["name"]]
+    assert len(obrien_schools) == 1, f"Expected to find O'Brien Elementary"
+
+    # Step 3: Send GET request with ?q=test--injection
+    response = client.get(
+        "/search?q=test--injection",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 4: Verify no SQL injection occurs
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    # FTS5 should handle double dashes safely
+
+    # Step 5: Send GET request with ?q=test*
+    response = client.get(
+        "/search?q=test*",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 6: Verify wildcard handled appropriately for FTS5
+    # FTS5 uses * as a wildcard, which is valid - should not error
+    # but should be handled safely
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data

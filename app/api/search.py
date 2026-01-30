@@ -11,6 +11,27 @@ from app.models.database import APIKey
 router = APIRouter()
 
 
+def sanitize_fts5_query(query: str) -> str:
+    """
+    Sanitize a query string for safe use with FTS5 MATCH.
+
+    FTS5 has special characters that can cause syntax errors if not escaped.
+    This function wraps the query in double quotes to treat it as a phrase,
+    which escapes all special characters.
+
+    Args:
+        query: Raw user input query string
+
+    Returns:
+        Sanitized query string safe for FTS5 MATCH
+    """
+    # Remove any existing double quotes to prevent nesting
+    query = query.replace('"', '')
+
+    # Wrap in double quotes to treat as a phrase (escapes all special chars)
+    return f'"{query}"'
+
+
 @router.get("/search")
 async def search(
     q: str,
@@ -23,6 +44,9 @@ async def search(
     """Full-text search for schools, districts, and other entities."""
     # Cap limit at 50 (max for search endpoint)
     limit = min(limit, 50)
+
+    # Sanitize query for FTS5
+    sanitized_query = sanitize_fts5_query(q)
 
     # Validate year parameter if provided
     if year:
@@ -62,7 +86,7 @@ async def search(
             ORDER BY rank
             LIMIT :limit
         """)
-        result = db.execute(query, {"search_query": q, "entity_type": type, "limit": limit})
+        result = db.execute(query, {"search_query": sanitized_query, "entity_type": type, "limit": limit})
     else:
         # No type filter
         query = text("""
@@ -72,7 +96,7 @@ async def search(
             ORDER BY rank
             LIMIT :limit
         """)
-        result = db.execute(query, {"search_query": q, "limit": limit})
+        result = db.execute(query, {"search_query": sanitized_query, "limit": limit})
 
     rows = result.fetchall()
 

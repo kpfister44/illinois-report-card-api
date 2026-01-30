@@ -647,7 +647,7 @@
       "Step 5: Send GET request with ?q=test*",
       "Step 6: Verify wildcard handled appropriately for FTS5"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
