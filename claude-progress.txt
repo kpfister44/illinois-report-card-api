@@ -2768,3 +2768,57 @@ The POST /query endpoint now supports:
 - Server running and verified
 - Progress documented
 
+
+
+---
+
+## Session 14 Continued - Tests #59-60 Complete
+
+### Test #59: POST /query supports pagination with limit and offset ✅
+
+**Test Implementation:**
+- Added test_post_query_supports_pagination
+- Test validates all 6 steps:
+  1. Import 50 test schools
+  2. Request first page (limit=10, offset=0)
+  3. Verify 10 results returned
+  4. Request second page (limit=10, offset=10)
+  5. Verify no overlap between pages
+  6. Verify meta.total reflects actual count (50)
+
+**Status:**
+- Pagination was already fully implemented (limit/offset parameters)
+- Test documents and validates existing behavior
+- Confirms pagination works correctly with no overlaps
+
+### Test #60: POST /query validates request body and returns appropriate errors ✅
+
+**Test Implementation:**
+- Added test_post_query_validates_request_body
+- Test validates error handling:
+  1. Missing required field (year) → 422 Pydantic validation error
+  2. Invalid entity_type → 400 with INVALID_PARAMETER code
+  3. Non-existent year → 400 with appropriate error message
+
+**Status:**
+- Validation was already implemented
+- Pydantic handles missing required fields
+- Endpoint validates year/entity_type combinations
+- Test documents existing validation behavior
+
+## Progress Update
+- **Tests completed this session: 5** (#56, #57, #58, #59, #60)
+- **Status: 61/86 tests passing (70.9%)**
+- **Query endpoint: 7/7 tests passing (100% complete)**
+
+## Query Endpoint Complete Summary
+All POST /query functionality is now fully tested:
+✅ Field selection
+✅ Equality filters
+✅ Comparison operators (gte, lte, gt, lt)
+✅ Range queries
+✅ IN operator
+✅ Sorting (asc/desc)
+✅ Pagination (limit/offset)
+✅ Request validation and error handling
+
