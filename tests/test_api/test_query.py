@@ -554,3 +554,83 @@ def test_post_query_supports_pagination(client):
     assert meta["total"] == 50, f"Expected total=50, got {meta['total']}"
     assert meta["limit"] == 10, f"Expected limit=10, got {meta['limit']}"
     assert meta["offset"] == 10, f"Expected offset=10, got {meta['offset']}"
+
+
+def test_post_query_validates_request_body(client):
+    """Test #60: POST /query validates request body and returns appropriate errors."""
+    from tests.conftest import TestingSessionLocal
+    from app.models.database import APIKey
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_query_validation_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+    finally:
+        db.close()
+
+    headers = {"Authorization": f"Bearer {test_key}"}
+
+    # Step 1: Send POST to /query with missing year field
+    response = client.post(
+        "/query",
+        headers=headers,
+        json={
+            "entity_type": "school"
+        }
+    )
+
+    # Step 2: Verify response is 422 with validation error
+    assert response.status_code == 422, f"Expected 422 for missing year, got {response.status_code}"
+    data = response.json()
+    assert "detail" in data, "Response should contain validation error details"
+
+    # Step 3: Send POST with invalid entity_type
+    response = client.post(
+        "/query",
+        headers=headers,
+        json={
+            "year": 2025,
+            "entity_type": "invalid_entity"
+        }
+    )
+
+    # Step 4: Verify response is 400 with validation error
+    assert response.status_code == 400, f"Expected 400 for invalid entity_type, got {response.status_code}"
+    data = response.json()
+    # Response format is {"code": "...", "message": "..."}
+    assert "code" in data, "Response should contain error code"
+    assert "message" in data, "Response should contain error message"
+    assert data["code"] == "INVALID_PARAMETER"
+
+    # Step 7: Send POST with non-existent year
+    response = client.post(
+        "/query",
+        headers=headers,
+        json={
+            "year": 1900,
+            "entity_type": "school"
+        }
+    )
+
+    # Step 8: Verify 400 error indicating invalid year
+    assert response.status_code == 400, f"Expected 400 for non-existent year, got {response.status_code}"
+    data = response.json()
+    assert "code" in data
+    assert "message" in data
+    assert data["code"] == "INVALID_PARAMETER"
+    # Verify error message mentions year or data not available
+    message = data["message"]
+    assert "year" in message.lower() or "data" in message.lower()

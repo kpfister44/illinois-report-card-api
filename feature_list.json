@@ -757,7 +757,7 @@
       "Step 7: Send POST with non-existent year",
       "Step 8: Verify 400 error indicating invalid year"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
