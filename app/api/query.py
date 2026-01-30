@@ -1,7 +1,7 @@
 # ABOUTME: Flexible query endpoint
 # ABOUTME: Allows POST requests with field selection, filtering, sorting, and pagination
 
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -17,6 +17,7 @@ class QueryRequest(BaseModel):
     year: int
     entity_type: str
     fields: Optional[List[str]] = None
+    filters: Optional[Dict[str, Any]] = None
     limit: Optional[int] = 100
     offset: Optional[int] = 0
 
@@ -55,18 +56,30 @@ async def query(
 
     table_name = f"{table_base}_{request.year}"
 
-    # Get total count
-    count_query = text(f"SELECT COUNT(*) as total FROM {table_name}")
-    result = db.execute(count_query)
+    # Build WHERE clause for filters
+    where_conditions = []
+    query_params = {"limit": request.limit, "offset": request.offset}
+
+    if request.filters:
+        for field, value in request.filters.items():
+            where_conditions.append(f"{field} = :{field}")
+            query_params[field] = value
+
+    where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
+
+    # Get total count with filters
+    count_query = text(f"SELECT COUNT(*) as total FROM {table_name} {where_clause}")
+    result = db.execute(count_query, query_params)
     total = result.scalar()
 
-    # Get paginated data with field selection
+    # Get paginated data with field selection and filters
     data_query = text(f"""
         SELECT {select_clause}
         FROM {table_name}
+        {where_clause}
         LIMIT :limit OFFSET :offset
     """)
-    result = db.execute(data_query, {"limit": request.limit, "offset": request.offset})
+    result = db.execute(data_query, query_params)
 
     # Convert rows to dictionaries
     rows = result.fetchall()
