@@ -447,3 +447,110 @@ def test_post_query_supports_sorting(client):
     names = [r["school_name"] for r in results]
     assert names == ["Apple School", "Banana School", "Cherry School", "Zebra School"], \
         f"Expected alphabetical order, got {names}"
+
+
+def test_post_query_supports_pagination(client):
+    """Test #59: POST /query supports pagination with limit and offset."""
+    from tests.conftest import TestingSessionLocal, engine
+    from sqlalchemy import text
+    from app.services.table_manager import create_year_table
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_query_pagination_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import 50 test schools
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"}
+        ]
+        create_year_table(2025, "schools", schema, engine)
+
+        # Insert 50 test schools
+        values = []
+        for i in range(1, 51):
+            rcdts = f"{i:02d}-016-{i:04d}-17-{i:04d}"
+            name = f"Test School {i:02d}"
+            city = "TestCity"
+            values.append(f"('{rcdts}', '{name}', '{city}')")
+
+        insert_query = text(f"""
+            INSERT INTO schools_2025 (rcdts, school_name, city)
+            VALUES {', '.join(values)}
+        """)
+        db.execute(insert_query)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send POST to /query with limit: 10, offset: 0
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "limit": 10,
+            "offset": 0
+        }
+    )
+
+    # Step 3: Verify 10 results returned
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    results_page1 = data["data"]
+
+    assert len(results_page1) == 10, f"Expected 10 results in first page, got {len(results_page1)}"
+
+    # Extract IDs from first page for overlap checking
+    page1_rcdts = [r["rcdts"] for r in results_page1]
+
+    # Step 4: Send POST with limit: 10, offset: 10
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "limit": 10,
+            "offset": 10
+        }
+    )
+
+    # Step 5: Verify next 10 results returned (no overlap)
+    assert response.status_code == 200
+    data = response.json()
+    results_page2 = data["data"]
+
+    assert len(results_page2) == 10, f"Expected 10 results in second page, got {len(results_page2)}"
+
+    # Extract IDs from second page
+    page2_rcdts = [r["rcdts"] for r in results_page2]
+
+    # Verify no overlap between pages
+    overlap = set(page1_rcdts) & set(page2_rcdts)
+    assert len(overlap) == 0, f"Found overlap between pages: {overlap}"
+
+    # Step 6: Verify meta.total reflects actual total count
+    assert "meta" in data
+    meta = data["meta"]
+    assert "total" in meta
+    assert meta["total"] == 50, f"Expected total=50, got {meta['total']}"
+    assert meta["limit"] == 10, f"Expected limit=10, got {meta['limit']}"
+    assert meta["offset"] == 10, f"Expected offset=10, got {meta['offset']}"

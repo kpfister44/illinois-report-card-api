@@ -742,7 +742,7 @@
       "Step 5: Verify next 10 results returned (no overlap)",
       "Step 6: Verify meta.total reflects actual total count"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
