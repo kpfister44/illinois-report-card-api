@@ -2325,3 +2325,112 @@ Continue with Phase 3 (Core REST API) - Search Features:
 
 After search functionality complete, move to POST /query flexible endpoint and remaining features.
 
+# Claude Progress - Session 13
+
+## Date: 2026-01-30
+
+## Session Summary
+Completed test #51 (later renumbered to #52): GET /search handles special characters and query sanitization. Followed TDD methodology strictly: wrote test first, verified failure, implemented minimal solution, verified success. Added FTS5 query sanitization to prevent syntax errors from special characters.
+
+## Completed Tasks
+
+### Test #51/#52: GET /search handles special characters and query sanitization ✅
+
+**Test Implementation (test_search.py):**
+- Added test_get_search_handles_special_characters_and_sanitization
+- Created test entities with special characters:
+  - "O'Brien Elementary" (apostrophe)
+  - "St. Mary's School" (apostrophe)
+  - "Test--Injection School" (double dash)
+- Verified all 6 steps:
+  1. Query with apostrophe (O'Brien) - no error
+  2. Proper escaping confirmed
+  3. Query with double dashes (test--injection)
+  4. No SQL injection
+  5. Query with wildcard (test*)
+  6. Wildcard handled safely
+
+**TDD Process:**
+1. RED: Wrote failing test - got expected error: "fts5: syntax error near \"'\""
+2. GREEN: Implemented sanitize_fts5_query() function
+3. VERIFY: Test passed, all 5 search tests still passing
+
+**Implementation (app/api/search.py):**
+- Added sanitize_fts5_query() function:
+  - Removes any existing double quotes
+  - Wraps query in double quotes (phrase search)
+  - This escapes all FTS5 special characters safely
+- Applied sanitization before all FTS5 MATCH queries
+- Handles: apostrophes, quotes, wildcards (*), operators (AND/OR/NOT), parentheses, dashes
+
+**Manual Verification:**
+- Tested with live server on various special character queries
+- Setup FTS5 tables in production database
+- All queries work without errors
+
+## Key Technical Decisions
+
+### FTS5 Query Sanitization Strategy
+**Decision:** Wrap all queries in double quotes for phrase search
+
+**Rationale:**
+- FTS5 special characters can cause syntax errors: ' " * ( ) AND OR NOT NEAR
+- Wrapping in double quotes treats input as literal phrase
+- Simpler than complex escaping rules
+- Prevents all injection attacks
+- User can still get results, just as exact phrases
+
+**Trade-offs:**
+- Loses FTS5 boolean operators (can't use AND/OR/NOT)
+- Loses wildcard prefix matching (*)
+- More restrictive than allowing all FTS5 features
+- **Benefit:** Complete safety, no syntax errors, simpler code
+
+**Alternative considered:** Selective escaping of special chars
+- Rejected: Complex, error-prone, easy to miss edge cases
+- Quote wrapping is bulletproof and maintainable
+
+## Test Results
+- All 5 search tests passing (100%)
+- Test #51/#52 complete and verified
+- No regressions in existing tests
+- 52/86 tests passing (60.5% complete)
+
+## Git Commits
+- 012a4f2: feat(search): add FTS5 query sanitization for special characters - test #51 passing
+
+## Session Statistics
+- **Tests completed: 1** (#51/#52 - special character sanitization)
+- **Progress gain: +1.2%** (59.3% → 60.5%)
+- **New tests added: 1** (test_get_search_handles_special_characters_and_sanitization)
+- **Lines of code: +30** (sanitization function + test)
+- **Total commits: 1**
+
+## Next Steps
+
+Continue with remaining search features:
+
+1. **Test #52/#53: GET /search requires minimum query length** (4 steps)
+   - Validation for query parameter
+   - Return 400 for empty or too-short queries
+
+2. **Test #53/#54: GET /search returns results ranked by relevance** (4 steps)
+   - Verify FTS5 relevance ranking
+   - Most relevant results first
+
+3. **POST /query flexible endpoint** (tests #54-60)
+   - Field selection
+   - Equality filters
+   - Comparison operators
+   - IN operator
+   - Sorting
+   - Pagination
+   - Validation
+
+## Session Notes
+- Followed coding_prompt.md precisely (Step 1-9)
+- Started with verification tests (health + schools endpoints)
+- Discovered need to setup FTS5 tables in production DB
+- TDD methodology followed strictly (RED-GREEN-REFACTOR)
+- Query sanitization is security-critical - chose safest approach
+- All manual tests confirmed no errors with special characters
