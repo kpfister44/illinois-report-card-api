@@ -669,7 +669,7 @@
       "Step 3: Verify both results returned",
       "Step 4: Verify results are ordered by relevance (exact match higher)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

@@ -543,3 +543,86 @@ def test_get_search_requires_minimum_query_length(client):
     data = response.json()
     assert "data" in data
     assert "meta" in data
+
+
+def test_get_search_returns_results_ranked_by_relevance(client):
+    """Test #53: GET /search returns results ranked by relevance."""
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_search_relevance_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+
+        # Step 1: Import school named 'Lincoln Elementary School' and 'Abraham Lincoln High'
+        entities = [
+            EntitiesMaster(
+                rcdts="05-016-2140-17-1001",
+                entity_type="school",
+                name="Lincoln Elementary School",
+                city="Springfield",
+                county="Sangamon"
+            ),
+            EntitiesMaster(
+                rcdts="05-016-2140-17-1002",
+                entity_type="school",
+                name="Abraham Lincoln High",
+                city="Springfield",
+                county="Sangamon"
+            ),
+            EntitiesMaster(
+                rcdts="05-016-2140-17-1003",
+                entity_type="school",
+                name="Lincoln Park Academy",
+                city="Springfield",
+                county="Sangamon"
+            )
+        ]
+
+        for entity in entities:
+            db.add(entity)
+
+        db.commit()
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /search?q=Lincoln
+    response = client.get(
+        "/search?q=Lincoln",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify both results returned
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    results = data["data"]
+    assert len(results) >= 2, f"Expected at least 2 Lincoln schools, got {len(results)}"
+
+    # Step 4: Verify results are ordered by relevance (exact match higher)
+    # FTS5 ranks by relevance - schools with "Lincoln" earlier in name should rank higher
+    # "Lincoln Elementary School" should rank higher than "Abraham Lincoln High"
+    # because the search term appears at the beginning
+    lincoln_elementary = next((r for r in results if "Lincoln Elementary" in r["name"]), None)
+    abraham_lincoln = next((r for r in results if "Abraham Lincoln" in r["name"]), None)
+
+    assert lincoln_elementary is not None, "Lincoln Elementary should be in results"
+    assert abraham_lincoln is not None, "Abraham Lincoln High should be in results"
+
+    # Check that Lincoln Elementary appears before Abraham Lincoln in results
+    lincoln_elem_idx = results.index(lincoln_elementary)
+    abraham_idx = results.index(abraham_lincoln)
+
+    assert lincoln_elem_idx < abraham_idx, \
+        f"Lincoln Elementary (index {lincoln_elem_idx}) should rank higher than Abraham Lincoln (index {abraham_idx})"
