@@ -42,6 +42,16 @@ async def search(
     db: Session = Depends(get_db)
 ):
     """Full-text search for schools, districts, and other entities."""
+    # Validate query parameter is not empty
+    if not q or not q.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_PARAMETER",
+                "message": "Query parameter 'q' is required and cannot be empty"
+            }
+        )
+
     # Cap limit at 50 (max for search endpoint)
     limit = min(limit, 50)
 

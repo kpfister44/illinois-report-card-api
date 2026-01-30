@@ -493,3 +493,53 @@ def test_get_search_handles_special_characters_and_sanitization(client):
     assert response.status_code == 200
     data = response.json()
     assert "data" in data
+
+
+def test_get_search_requires_minimum_query_length(client):
+    """Test #52: GET /search requires minimum query length."""
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_search_minlen_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+    finally:
+        db.close()
+
+    # Step 1: Send authenticated GET request to /search?q=
+    response = client.get(
+        "/search?q=",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 2: Verify response is 400 (query required)
+    assert response.status_code == 400
+    data = response.json()
+    assert "code" in data
+    assert data["code"] == "INVALID_PARAMETER"
+    assert "message" in data
+    assert "query" in data["message"].lower() or "required" in data["message"].lower()
+
+    # Step 3: Send GET request with ?q=a
+    response = client.get(
+        "/search?q=a",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 4: Verify single character search works (min 1 char per spec)
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "meta" in data
