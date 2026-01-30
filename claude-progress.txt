@@ -2644,3 +2644,42 @@ All search functionality is now complete and tested:
 - **Status: 57/86 tests passing (66.3%)**
 - **Query endpoint: 3/3 tests passing**
 
+
+
+---
+
+## Session 14 Update - Test #57 Complete
+
+### Test #57: POST /query supports IN operator for multiple values ✅
+
+**Test Implementation:**
+- Added test_post_query_supports_in_operator to tests/test_api/test_query.py
+- Test validates all 4 steps:
+  1. Import schools in Chicago, Springfield, and Peoria
+  2. POST with filters: {"city": {"in": ["Chicago", "Springfield"]}}
+  3. Verify only schools in Chicago or Springfield returned (4 schools)
+  4. Verify Peoria schools are excluded
+
+**TDD Process:**
+1. RED: Wrote failing test - got all 6 schools, filter was ignored
+2. GREEN: Implemented IN operator detection and SQL building
+3. VERIFY: Test passed, all 4 query tests passing (no regressions)
+
+**Implementation (app/api/query.py):**
+- Added "in" operator handling within dict value detection
+- Validates that IN value is a list
+- Builds SQL IN clause with parameterized placeholders
+- Each list item gets unique parameter name (filter_0, filter_1, etc.)
+- Prevents SQL injection via parameterized queries
+
+**Key Design Decisions:**
+- IN operator requires list value, skips if not a list
+- Builds dynamic placeholders for each value in the list
+- Combines with other operators (can use IN with gte/lte on different fields)
+- Maintains parameter counter for unique naming across all operators
+
+## Progress Update
+- **Tests completed: 2** (#56, #57)
+- **Status: 58/86 tests passing (67.4%)**
+- **Query endpoint: 4/4 tests passing**
+
