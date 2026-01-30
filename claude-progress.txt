@@ -2601,3 +2601,46 @@ All search functionality is now complete and tested:
 - **Status: 56/86 tests passing (65.1%)**
 - **Query endpoint: 2/2 tests passing**
 
+
+
+---
+
+## Session 14 Update - Test #56 Complete
+
+### Test #56: POST /query supports comparison operators (gte, lte, gt, lt) ✅
+
+**Test Implementation:**
+- Added test_post_query_supports_comparison_operators to tests/test_api/test_query.py
+- Test validates all 7 steps:
+  1. Import schools with varying enrollment (100, 500, 1000, 2000)
+  2. POST with filters: {"enrollment": {"gte": 500}}
+  3. Verify only schools with enrollment >= 500 returned (3 schools)
+  4. POST with filters: {"enrollment": {"lt": 1000}}
+  5. Verify only schools with enrollment < 1000 returned (2 schools)
+  6. POST with filters: {"enrollment": {"gte": 500, "lte": 1500}}
+  7. Verify range filter works correctly (2 schools in range)
+
+**TDD Process:**
+1. RED: Wrote failing test - got ProgrammingError binding dict as parameter
+2. GREEN: Implemented comparison operator detection and SQL building
+3. VERIFY: Test passed, all 3 query tests passing (no regressions)
+
+**Implementation (app/api/query.py):**
+- Extended filter logic to detect dict values with comparison operators
+- Added support for: gte (>=), lte (<=), gt (>), lt (<)
+- Maintains backward compatibility with simple equality filters
+- Multiple operators on same field combined with AND
+- Uses unique parameter names to avoid collisions
+- Parameterized queries prevent SQL injection
+
+**Key Design Decisions:**
+- Dict detection: Check if filter value is dict before processing
+- Operator mapping: Direct mapping to SQL operators (gte -> >=, etc.)
+- Parameter naming: Use counter-based naming (filter_0, filter_1, etc.)
+- Range queries: Multiple operators on same field create AND conditions
+
+## Progress Update
+- **Tests completed: 1** (#56)
+- **Status: 57/86 tests passing (66.3%)**
+- **Query endpoint: 3/3 tests passing**
+
