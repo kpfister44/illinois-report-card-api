@@ -2519,3 +2519,45 @@ All search functionality is now complete and tested:
 ✅ Query validation (test #52)
 ✅ Relevance ranking (test #53)
 
+
+---
+
+## Session 13 Update - Test #54 Complete
+
+### Test #54: POST /query executes flexible queries with field selection ✅
+
+**Test Implementation:**
+- Created new test file: tests/test_api/test_query.py
+- Test validates all 5 steps:
+  1. Import test schools for year 2025
+  2. POST to /query with field selection
+  3. Verify 200 response
+  4. Verify only requested fields returned
+  5. Verify meta includes total, limit, offset
+
+**TDD Process:**
+1. RED: Wrote failing test - got 404 (endpoint doesn't exist)
+2. GREEN: Implemented minimal POST /query endpoint
+3. VERIFY: Test passed, no regressions
+
+**Implementation (app/api/query.py):**
+- Created QueryRequest Pydantic model for request body
+- Validates year and entity_type parameters
+- Supports optional fields array for field selection
+- Default pagination: limit=100, offset=0
+- Uses year-partitioned tables via table_manager
+- Returns 400 if year/entity_type combination doesn't exist
+- Returns data array with only requested fields
+- Includes meta with total, limit, offset
+
+**Key Design Decisions:**
+- POST not GET: Request body allows complex queries
+- Pydantic validation: Type-safe request parsing
+- Field selection: If fields provided, only return those columns
+- Consistent response format: {data: [], meta: {}}
+
+## Progress Update
+- **Tests completed: 4** (#51-54)
+- **Status: 55/86 tests passing (64.0%)**
+- **Query endpoint: 1/1 tests passing**
+
