@@ -1,7 +1,7 @@
 # ABOUTME: Search endpoint
 # ABOUTME: Full-text search across all entities
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text, inspect
 from sqlalchemy.orm import Session
 from app.dependencies import verify_api_key
@@ -16,10 +16,14 @@ async def search(
     q: str,
     type: str = None,
     year: int = None,
+    limit: int = Query(default=10, ge=1),
     api_key: APIKey = Depends(verify_api_key),
     db: Session = Depends(get_db)
 ):
     """Full-text search for schools, districts, and other entities."""
+    # Cap limit at 50 (max for search endpoint)
+    limit = min(limit, 50)
+
     # Validate year parameter if provided
     if year:
         # Get all available years from year-partitioned tables
@@ -56,8 +60,9 @@ async def search(
             WHERE entities_fts MATCH :search_query
             AND entity_type = :entity_type
             ORDER BY rank
+            LIMIT :limit
         """)
-        result = db.execute(query, {"search_query": q, "entity_type": type})
+        result = db.execute(query, {"search_query": q, "entity_type": type, "limit": limit})
     else:
         # No type filter
         query = text("""
@@ -65,8 +70,9 @@ async def search(
             FROM entities_fts
             WHERE entities_fts MATCH :search_query
             ORDER BY rank
+            LIMIT :limit
         """)
-        result = db.execute(query, {"search_query": q})
+        result = db.execute(query, {"search_query": q, "limit": limit})
 
     rows = result.fetchall()
 
@@ -117,6 +123,7 @@ async def search(
         "data": data,
         "meta": {
             "total": len(data),
+            "limit": limit,
             "query": q
         }
     }

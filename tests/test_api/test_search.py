@@ -326,3 +326,77 @@ def test_get_search_filters_by_year(client):
 
     # Verify meta.total reflects filtered count
     assert data["meta"]["total"] == 2
+
+
+def test_get_search_respects_limit_parameter_with_max_50(client):
+    """Test #51: GET /search respects limit parameter with max 50."""
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_search_limit_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import 100+ schools with Chicago in name or city
+        for i in range(100):
+            school = EntitiesMaster(
+                rcdts=f"15-016-{i:04d}-17-{i:04d}",
+                entity_type="school",
+                name=f"Chicago School {i}",
+                city="Chicago",
+                county="Cook"
+            )
+            db.add(school)
+
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET request to /search?q=Chicago
+    response = client.get(
+        "/search?q=Chicago",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 3: Verify default limit of 10 is applied
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["data"]) == 10
+    assert data["meta"]["limit"] == 10
+
+    # Step 4: Send GET request with ?limit=30
+    response = client.get(
+        "/search?q=Chicago&limit=30",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 5: Verify exactly 30 results returned
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["data"]) == 30
+    assert data["meta"]["limit"] == 30
+
+    # Step 6: Send GET request with ?limit=100
+    response = client.get(
+        "/search?q=Chicago&limit=100",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    # Step 7: Verify results capped at 50 (max limit)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["data"]) == 50  # Should be capped at 50
+    assert data["meta"]["limit"] == 50  # Should show effective limit
