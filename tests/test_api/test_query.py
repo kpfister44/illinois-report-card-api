@@ -356,3 +356,94 @@ def test_post_query_supports_in_operator(client):
     # Verify we got both Chicago and Springfield schools
     assert "Chicago" in cities, "Should have Chicago schools"
     assert "Springfield" in cities, "Should have Springfield schools"
+
+
+def test_post_query_supports_sorting(client):
+    """Test #58: POST /query supports sorting."""
+    from tests.conftest import TestingSessionLocal, engine
+    from sqlalchemy import text
+    from app.services.table_manager import create_year_table
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_query_sort_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import schools with varying enrollment
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"}
+        ]
+        create_year_table(2025, "schools", schema, engine)
+
+        # Insert test data with varying enrollment and names
+        insert_query = text("""
+            INSERT INTO schools_2025 (rcdts, school_name, enrollment)
+            VALUES
+                ('01-016-0001-17-0001', 'Zebra School', 300),
+                ('02-016-0002-17-0002', 'Apple School', 500),
+                ('03-016-0003-17-0003', 'Banana School', 100),
+                ('04-016-0004-17-0004', 'Cherry School', 1000)
+        """)
+        db.execute(insert_query)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send POST to /query with sort: {"field": "enrollment", "order": "desc"}
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "sort": {"field": "enrollment", "order": "desc"}
+        }
+    )
+
+    # Step 3: Verify schools ordered by enrollment descending
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    results = data["data"]
+
+    assert len(results) == 4, f"Expected 4 schools, got {len(results)}"
+
+    enrollments = [r["enrollment"] for r in results]
+    assert enrollments == [1000, 500, 300, 100], f"Expected descending order [1000, 500, 300, 100], got {enrollments}"
+
+    # Step 4: Send POST with sort: {"field": "school_name", "order": "asc"}
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "sort": {"field": "school_name", "order": "asc"}
+        }
+    )
+
+    # Step 5: Verify schools ordered alphabetically ascending
+    assert response.status_code == 200
+    data = response.json()
+    results = data["data"]
+
+    assert len(results) == 4, f"Expected 4 schools, got {len(results)}"
+
+    names = [r["school_name"] for r in results]
+    assert names == ["Apple School", "Banana School", "Cherry School", "Zebra School"], \
+        f"Expected alphabetical order, got {names}"

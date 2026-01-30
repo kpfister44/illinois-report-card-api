@@ -18,6 +18,7 @@ class QueryRequest(BaseModel):
     entity_type: str
     fields: Optional[List[str]] = None
     filters: Optional[Dict[str, Any]] = None
+    sort: Optional[Dict[str, str]] = None
     limit: Optional[int] = 100
     offset: Optional[int] = 0
 
@@ -102,6 +103,14 @@ async def query(
 
     where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
+    # Build ORDER BY clause for sorting
+    order_by_clause = ""
+    if request.sort:
+        field = request.sort.get("field")
+        order = request.sort.get("order", "asc").upper()
+        if field and order in ["ASC", "DESC"]:
+            order_by_clause = f"ORDER BY {field} {order}"
+
     # Get total count with filters
     count_query = text(f"SELECT COUNT(*) as total FROM {table_name} {where_clause}")
     result = db.execute(count_query, query_params)
@@ -112,6 +121,7 @@ async def query(
         SELECT {select_clause}
         FROM {table_name}
         {where_clause}
+        {order_by_clause}
         LIMIT :limit OFFSET :offset
     """)
     result = db.execute(data_query, query_params)

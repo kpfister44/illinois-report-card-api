@@ -729,7 +729,7 @@
       "Step 4: Send POST with sort: {\"field\": \"name\", \"order\": \"asc\"}",
       "Step 5: Verify schools ordered alphabetically ascending"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
