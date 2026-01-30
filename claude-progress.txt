@@ -2561,3 +2561,43 @@ All search functionality is now complete and tested:
 - **Status: 55/86 tests passing (64.0%)**
 - **Query endpoint: 1/1 tests passing**
 
+
+---
+
+## Session 13 Update - Test #55 Complete
+
+### Test #55: POST /query supports equality filters ✅
+
+**Test Implementation:**
+- Added test_post_query_supports_equality_filters
+- Creates schools in multiple cities (Chicago, Springfield, Naperville)
+- Validates all 4 steps:
+  1. Import schools in multiple cities
+  2. POST with filters: {"city": "Chicago"}
+  3. Verify all results are in Chicago
+  4. Verify total count matches (3 Chicago schools)
+
+**TDD Process:**
+1. RED: Wrote failing test - filters ignored, got Springfield schools
+2. GREEN: Added filters parameter and WHERE clause building
+3. VERIFY: Test passed, all 2 query tests passing
+
+**Implementation:**
+- Added filters: Optional[Dict[str, Any]] to QueryRequest
+- Build WHERE clause dynamically from filters dictionary
+- Each filter becomes "field = :field" in SQL
+- Multiple filters combined with AND
+- Applied to both COUNT and SELECT queries
+- Parameterized queries prevent SQL injection
+
+**Key Design:**
+- Dictionary format: {"field": "value"} for simplicity
+- Only equality filters for now (not gte/lte/in)
+- Dynamic WHERE clause building
+- Safe SQL via parameterized queries
+
+## Progress Update
+- **Tests completed: 5** (#51-55)
+- **Status: 56/86 tests passing (65.1%)**
+- **Query endpoint: 2/2 tests passing**
+
