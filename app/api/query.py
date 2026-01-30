@@ -61,9 +61,31 @@ async def query(
     query_params = {"limit": request.limit, "offset": request.offset}
 
     if request.filters:
+        param_counter = 0
         for field, value in request.filters.items():
-            where_conditions.append(f"{field} = :{field}")
-            query_params[field] = value
+            # Check if value is a dict with comparison operators
+            if isinstance(value, dict):
+                # Handle comparison operators: gte, lte, gt, lt
+                for operator, op_value in value.items():
+                    param_name = f"filter_{param_counter}"
+                    param_counter += 1
+
+                    if operator == "gte":
+                        where_conditions.append(f"{field} >= :{param_name}")
+                        query_params[param_name] = op_value
+                    elif operator == "lte":
+                        where_conditions.append(f"{field} <= :{param_name}")
+                        query_params[param_name] = op_value
+                    elif operator == "gt":
+                        where_conditions.append(f"{field} > :{param_name}")
+                        query_params[param_name] = op_value
+                    elif operator == "lt":
+                        where_conditions.append(f"{field} < :{param_name}")
+                        query_params[param_name] = op_value
+            else:
+                # Simple equality filter
+                where_conditions.append(f"{field} = :{field}")
+                query_params[field] = value
 
     where_clause = "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 

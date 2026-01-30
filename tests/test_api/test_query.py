@@ -167,3 +167,114 @@ def test_post_query_supports_equality_filters(client):
     assert "meta" in data
     assert data["meta"]["total"] == 3, f"Expected 3 Chicago schools, got {data['meta']['total']}"
     assert len(results) == 3, f"Expected 3 results, got {len(results)}"
+
+
+def test_post_query_supports_comparison_operators(client):
+    """Test #56: POST /query supports comparison operators (gte, lte, gt, lt)."""
+    from tests.conftest import TestingSessionLocal, engine
+    from sqlalchemy import text
+    from app.services.table_manager import create_year_table
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_query_comparison_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Step 1: Import schools with varying enrollment (100, 500, 1000, 2000)
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "enrollment", "data_type": "integer"}
+        ]
+        create_year_table(2025, "schools", schema, engine)
+
+        # Insert test data with varying enrollment
+        insert_query = text("""
+            INSERT INTO schools_2025 (rcdts, school_name, enrollment)
+            VALUES
+                ('01-016-0001-17-0001', 'Small School', 100),
+                ('02-016-0002-17-0002', 'Medium School', 500),
+                ('03-016-0003-17-0003', 'Large School', 1000),
+                ('04-016-0004-17-0004', 'Very Large School', 2000)
+        """)
+        db.execute(insert_query)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 2: Send POST with filters: {"enrollment": {"gte": 500}}
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "filters": {"enrollment": {"gte": 500}}
+        }
+    )
+
+    # Step 3: Verify only schools with enrollment >= 500 returned
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    results = data["data"]
+
+    assert len(results) == 3, f"Expected 3 schools (>=500), got {len(results)}"
+    enrollments = [r["enrollment"] for r in results]
+    assert all(e >= 500 for e in enrollments), f"All enrollments should be >= 500, got {enrollments}"
+    assert set(enrollments) == {500, 1000, 2000}, f"Expected enrollments [500, 1000, 2000], got {enrollments}"
+
+    # Step 4: Send POST with filters: {"enrollment": {"lt": 1000}}
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "filters": {"enrollment": {"lt": 1000}}
+        }
+    )
+
+    # Step 5: Verify only schools with enrollment < 1000 returned
+    assert response.status_code == 200
+    data = response.json()
+    results = data["data"]
+
+    assert len(results) == 2, f"Expected 2 schools (<1000), got {len(results)}"
+    enrollments = [r["enrollment"] for r in results]
+    assert all(e < 1000 for e in enrollments), f"All enrollments should be < 1000, got {enrollments}"
+    assert set(enrollments) == {100, 500}, f"Expected enrollments [100, 500], got {enrollments}"
+
+    # Step 6: Send POST with filters: {"enrollment": {"gte": 500, "lte": 1500}}
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "filters": {"enrollment": {"gte": 500, "lte": 1500}}
+        }
+    )
+
+    # Step 7: Verify range filter works correctly
+    assert response.status_code == 200
+    data = response.json()
+    results = data["data"]
+
+    assert len(results) == 2, f"Expected 2 schools (500-1500), got {len(results)}"
+    enrollments = [r["enrollment"] for r in results]
+    assert all(500 <= e <= 1500 for e in enrollments), f"All enrollments should be 500-1500, got {enrollments}"
+    assert set(enrollments) == {500, 1000}, f"Expected enrollments [500, 1000], got {enrollments}"
