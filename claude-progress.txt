@@ -3236,3 +3236,57 @@ compliance fix (API key prefix format).
 - Test #84: README.md contains complete setup and usage instructions
 - Test #85: Test coverage meets 90%+ threshold
 - Test #86: All pytest tests pass without errors or warnings
+
+---
+
+## Session 18 Summary
+
+### Date: 2026-02-02
+
+### Starting Status
+- **77/86 tests passing** (89.5%)
+- 9 tests remaining (#78-#86)
+
+### Ending Status
+- **79/86 tests passing** (91.9%)
+- 7 tests remaining (#80-#85, excluding #78/#79 which are done)
+- 94 pytest tests, 0 warnings
+
+### Tests Completed This Session
+
+#### Test #86: All pytest tests pass without errors or warnings ✅
+- Root cause: `datetime.utcnow()` calls throughout app and test code triggered 2472 deprecation warnings per run
+- Fixed all `utcnow()` calls → `datetime.now(timezone.utc)` in:
+  - `app/dependencies.py` (rate limit window, last_used_at)
+  - `app/api/admin.py` (import job completed_at, both success and failure paths)
+  - `app/models/database.py` (all Column defaults: APIKey.created_at, UsageLog.timestamp, EntitiesMaster.created_at, ImportJob.started_at)
+  - `tests/test_api/test_admin.py` (usage stats date filter test)
+- Also fixed pydantic `class Config` → `model_config = SettingsConfigDict(...)` in `app/config.py`
+- Also fixed sqlalchemy `from sqlalchemy.ext.declarative import declarative_base` → `from sqlalchemy.orm import declarative_base`
+- Fixed test_admin usage stats test: moved date params from URL string interpolation to `params={}` dict (the `+00:00` in timezone-aware isoformat was being URL-mangled as a space)
+- Result: 94 passed, 0 warnings
+
+#### Tests #78 and #79: Swagger UI and OpenAPI examples ✅
+- `/docs` was already returning 200; all 17 endpoints (16 paths) already had docstring descriptions
+- Added `responses` parameter with example JSON to all 17 route decorators covering success responses (200/201) and error responses (400, 401, 403, 404) as applicable
+- Added `model_config = ConfigDict(json_schema_extra={"example": ...})` to `QueryRequest` and `CreateAPIKeyRequest` pydantic models for request body examples
+- Defined reusable error response fragments in `app/models/errors.py` (`AUTH_REQUIRED`, `ADMIN_REQUIRED`, `NOT_FOUND`, `INVALID_YEAR`) to avoid duplication across route files
+- Verified: all 17 endpoints have response examples, both request models have examples
+
+### Git Commits This Session
+- `64f937b` fix(deps): replace deprecated utcnow() with now(timezone.utc)
+- `1f2d1db` feat(docs): add OpenAPI examples to all endpoints
+
+### Remaining Tests (7)
+- **Test #80**: Docker container builds and runs successfully
+- **Test #81**: Docker-compose starts development environment
+- **Test #82**: Environment variables configure application correctly
+- **Test #83**: Error messages are user-friendly and informative (likely already passing — error messages already include available years and resource IDs)
+- **Test #84**: README.md contains complete setup and usage instructions
+- **Test #85**: Test coverage meets 90%+ threshold (currently 80% — main gap is `app/cli/import_data.py` at 0% and `app/database.py` at 56%)
+
+### Notes for Next Session
+- Coverage is the biggest remaining effort. `cli/import_data.py` (133 lines, 0%) is the single biggest drag. `database.py` (56%), `fts5.py` (69%), and `districts.py` (86%) are secondary gaps.
+- Docker tests (#80/#81) require Docker to be available — verify first before attempting.
+- Test #83 (error messages) was partially verified this session: errors already include available years on invalid year, and resource IDs on 404. May just need a validation test written.
+- Server restarts: use `kill $(pgrep -f "uvicorn app.main:app"); sleep 1; .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 &`
