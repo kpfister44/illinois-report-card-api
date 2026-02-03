@@ -270,3 +270,111 @@ def test_admin_import_uploads_and_processes_excel_file(client):
 
     finally:
         db2.close()
+
+
+def test_admin_import_requires_admin_key(client):
+    """Test #64: Admin endpoint /admin/import requires admin API key."""
+    from tests.conftest import TestingSessionLocal
+
+    # Create NON-admin API key
+    db = TestingSessionLocal()
+    try:
+        key = "regular_user_key_123"
+        key_hash = hashlib.sha256(key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=key[:8],
+            owner_email="regular@example.com",
+            owner_name="Regular User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False  # NOT an admin
+        )
+        db.add(api_key)
+        db.commit()
+    finally:
+        db.close()
+
+    # Create test Excel file
+    excel_file = create_test_excel_file()
+
+    # Step 1: Send POST to /admin/import with non-admin API key
+    response = client.post(
+        "/admin/import",
+        headers={"Authorization": f"Bearer {key}"},
+        files={"file": ("test.xlsx", excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        data={"year": "2025"}
+    )
+
+    # Step 2: Verify response status code is 403
+    assert response.status_code == 403, f"Expected 403, got {response.status_code}"
+
+    # Step 3 & 4: Verify error code and message
+    data = response.json()
+    assert "code" in data, "Response should contain error code"
+    assert "message" in data, "Response should contain error message"
+    assert data["code"] == "FORBIDDEN", f"Expected FORBIDDEN code, got {data['code']}"
+    assert "admin" in data["message"].lower(), "Error message should mention admin requirement"
+
+
+def test_admin_import_rejects_invalid_file_types(client):
+    """Test #66: POST /admin/import rejects invalid file types with 400 error."""
+    from tests.conftest import TestingSessionLocal
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+    finally:
+        db.close()
+
+    # Step 1: Create a text file (not Excel)
+    text_file = BytesIO(b"This is a text file, not an Excel file")
+
+    # Step 2 & 3: Send POST to /admin/import with non-Excel file
+    response = client.post(
+        "/admin/import",
+        headers={"Authorization": f"Bearer {admin_key}"},
+        files={"file": ("test.txt", text_file, "text/plain")},
+        data={"year": "2025"}
+    )
+
+    # Step 4: Verify response status code is 400
+    assert response.status_code == 400, f"Expected 400, got {response.status_code}"
+
+    # Step 5 & 6: Verify error code and message
+    data = response.json()
+    assert "code" in data, "Response should contain error code"
+    assert "message" in data, "Response should contain error message"
+    assert data["code"] == "INVALID_FILE_TYPE", f"Expected INVALID_FILE_TYPE, got {data['code']}"
+    assert "excel" in data["message"].lower() or ".xlsx" in data["message"].lower(), \
+        "Error message should mention Excel file requirement"
+
+
+def test_admin_import_status_returns_404_for_nonexistent_id(client):
+    """Test #68: GET /admin/import/status returns 404 for non-existent import_id."""
+    from tests.conftest import TestingSessionLocal
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+    finally:
+        db.close()
+
+    # Step 1: Send GET to /admin/import/status with non-existent import_id
+    nonexistent_id = "nonexistent_import_12345"
+    response = client.get(
+        f"/admin/import/status/{nonexistent_id}",
+        headers={"Authorization": f"Bearer {admin_key}"}
+    )
+
+    # Step 2: Verify response status code is 404
+    assert response.status_code == 404, f"Expected 404, got {response.status_code}"
+
+    # Step 3 & 4: Verify error code and message includes the import_id
+    data = response.json()
+    assert "code" in data, "Response should contain error code"
+    assert "message" in data, "Response should contain error message"
+    assert data["code"] == "NOT_FOUND", f"Expected NOT_FOUND, got {data['code']}"
+    assert nonexistent_id in data["message"], "Error message should include the requested import_id"

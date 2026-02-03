@@ -796,7 +796,7 @@
       "Step 3: Verify error code is FORBIDDEN",
       "Step 4: Verify error message indicates admin access required"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -821,7 +821,7 @@
       "Step 5: Verify error response has code INVALID_FILE_TYPE",
       "Step 6: Verify error message indicates Excel file required"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -845,7 +845,7 @@
       "Step 3: Verify error response has code NOT_FOUND",
       "Step 4: Verify error message includes the requested import_id"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
