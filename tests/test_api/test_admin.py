@@ -1015,3 +1015,47 @@ def test_rate_limit_tiers_enforce_different_limits(client):
     for i in range(200):
         response = client.get("/years", headers={"Authorization": f"Bearer {premium_key}"})
         assert response.status_code == 200, f"Premium tier request {i+1}/200 should succeed, got {response.status_code}"
+
+
+def test_database_indexes_created(client):
+    """Test #77: Database indexes are created for performance."""
+    from tests.conftest import TestingSessionLocal, engine
+    from sqlalchemy import inspect as sqla_inspect
+    from app.services.table_manager import create_year_table
+
+    db = TestingSessionLocal()
+    try:
+        # Create a schools_2025 table so we can verify its indexes
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+        ]
+        create_year_table(2025, "schools", schema, engine)
+    finally:
+        db.close()
+
+    inspector = sqla_inspect(engine)
+
+    # Step 1: Check entities_master has unique index on rcdts
+    em_indexes = inspector.get_indexes("entities_master")
+    em_index_cols = [tuple(idx["column_names"]) for idx in em_indexes]
+    assert ("rcdts",) in em_index_cols, f"entities_master should have index on rcdts, got: {em_indexes}"
+
+    # Step 2: Check entities_master has index on entity_type
+    assert ("entity_type",) in em_index_cols, f"entities_master should have index on entity_type, got: {em_indexes}"
+
+    # Step 3: Check schools_YYYY has index on rcdts
+    schools_indexes = inspector.get_indexes("schools_2025")
+    schools_index_cols = [tuple(idx["column_names"]) for idx in schools_indexes]
+    assert ("rcdts",) in schools_index_cols, f"schools_2025 should have index on rcdts, got: {schools_indexes}"
+
+    # Step 4: Check api_keys has unique index on key_hash
+    ak_indexes = inspector.get_indexes("api_keys")
+    ak_index_cols = [tuple(idx["column_names"]) for idx in ak_indexes]
+    assert ("key_hash",) in ak_index_cols, f"api_keys should have index on key_hash, got: {ak_indexes}"
+
+    # Step 5: Check usage_logs has indexes on api_key_id and timestamp
+    ul_indexes = inspector.get_indexes("usage_logs")
+    ul_index_cols = [tuple(idx["column_names"]) for idx in ul_indexes]
+    assert ("api_key_id",) in ul_index_cols, f"usage_logs should have index on api_key_id, got: {ul_indexes}"
+    assert ("timestamp",) in ul_index_cols, f"usage_logs should have index on timestamp, got: {ul_indexes}"

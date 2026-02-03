@@ -3,7 +3,7 @@
 
 from sqlalchemy import (
     Table, Column, Integer, String, Float, Text, DateTime,
-    MetaData, inspect
+    MetaData, Index, inspect
 )
 from sqlalchemy.sql import func
 from typing import List, Dict, Optional
@@ -62,6 +62,11 @@ def create_year_table(
 
     # Create table object
     table = Table(table_name, metadata, *columns)
+
+    # Add index on rcdts if present (used for joins to entities_master)
+    col_names = [col_def["column_name"] for col_def in schema]
+    if "rcdts" in col_names:
+        Index(f"ix_{table_name}_rcdts", table.c.rcdts)
 
     # Create the table in the database
     metadata.create_all(engine)

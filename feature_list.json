@@ -964,7 +964,7 @@
       "Step 4: Check api_keys has unique index on key_hash",
       "Step 5: Check usage_logs has indexes on api_key_id and timestamp"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
