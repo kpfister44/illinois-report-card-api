@@ -3,7 +3,7 @@
 
 import hashlib
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import Header, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
 from typing import Annotated
@@ -65,7 +65,7 @@ async def verify_api_key(
     window_seconds = 60  # 1 minute window
 
     # Count requests in the current window
-    window_start = datetime.utcnow() - timedelta(seconds=window_seconds)
+    window_start = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
     recent_requests = db.query(UsageLog).filter(
         UsageLog.api_key_id == api_key.id,
         UsageLog.timestamp >= window_start
@@ -93,7 +93,7 @@ async def verify_api_key(
         )
 
     # Update last_used_at
-    api_key.last_used_at = datetime.utcnow()
+    api_key.last_used_at = datetime.now(timezone.utc)
 
     # Store start time for response time calculation
     request.state.request_start_time = time.time()

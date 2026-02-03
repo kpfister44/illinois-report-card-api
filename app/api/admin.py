@@ -4,7 +4,7 @@
 import secrets
 import hashlib
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
@@ -175,7 +175,6 @@ async def get_usage_statistics(
     Returns usage logs with optional filtering by date range and/or API key.
     """
     from app.models.database import UsageLog
-    from datetime import datetime
 
     # Start with base query
     query = db.query(UsageLog)
@@ -385,7 +384,7 @@ async def import_excel_file(
         # Update import job as completed
         import_job.status = "completed"
         import_job.records_imported = records_imported
-        import_job.completed_at = datetime.utcnow()
+        import_job.completed_at = datetime.now(timezone.utc)
         db.commit()
 
         # Clean up temp file
@@ -402,7 +401,7 @@ async def import_excel_file(
         # Mark import as failed
         import_job.status = "failed"
         import_job.error_message = str(e)
-        import_job.completed_at = datetime.utcnow()
+        import_job.completed_at = datetime.now(timezone.utc)
         db.commit()
 
         raise HTTPException(

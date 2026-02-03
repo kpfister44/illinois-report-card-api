@@ -1,10 +1,9 @@
 # ABOUTME: SQLAlchemy database models
 # ABOUTME: Defines tables for api_keys, usage_logs, entities_master, and schema_metadata
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
@@ -18,7 +17,7 @@ class APIKey(Base):
     key_prefix = Column(String(20), nullable=False)
     owner_email = Column(Text)
     owner_name = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_used_at = Column(DateTime)
     is_active = Column(Boolean, default=True)
     rate_limit_tier = Column(String(20), default="free")
@@ -38,7 +37,7 @@ class UsageLog(Base):
     method = Column(String(10), nullable=False)
     status_code = Column(Integer, nullable=False)
     response_time_ms = Column(Integer)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     ip_address = Column(String(45))
 
     api_key = relationship("APIKey", back_populates="usage_logs")
@@ -54,7 +53,7 @@ class EntitiesMaster(Base):
     name = Column(Text)
     city = Column(Text)
     county = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class SchemaMetadata(Base):
@@ -83,6 +82,6 @@ class ImportJob(Base):
     status = Column(String(20), nullable=False)  # processing | completed | failed
     records_imported = Column(Integer, default=0)
     error_message = Column(Text)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime)
     api_key_id = Column(Integer, ForeignKey("api_keys.id"))

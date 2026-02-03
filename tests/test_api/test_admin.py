@@ -845,7 +845,7 @@ def test_admin_delete_api_key(client):
 def test_admin_usage_statistics(client):
     """Test #73: Admin endpoint GET /admin/usage returns usage statistics."""
     from tests.conftest import TestingSessionLocal
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     # Create admin API key
     db = TestingSessionLocal()
@@ -903,12 +903,13 @@ def test_admin_usage_statistics(client):
         assert "timestamp" in log, "Each log should have timestamp"
 
     # Step 4: Filter with ?start_date and ?end_date
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     start_date = (now - timedelta(hours=1)).isoformat()
     end_date = now.isoformat()
 
     filtered_response = client.get(
-        f"/admin/usage?start_date={start_date}&end_date={end_date}",
+        "/admin/usage",
+        params={"start_date": start_date, "end_date": end_date},
         headers={"Authorization": f"Bearer {admin_key}"}
     )
 
