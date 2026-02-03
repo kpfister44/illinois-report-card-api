@@ -351,6 +351,74 @@ def test_admin_import_rejects_invalid_file_types(client):
         "Error message should mention Excel file requirement"
 
 
+def test_admin_import_status_returns_import_progress(client):
+    """Test #65: Admin endpoint GET /admin/import/status/{id} returns import progress."""
+    from tests.conftest import TestingSessionLocal
+    import time
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+    finally:
+        db.close()
+
+    # Step 1: Start an import via POST /admin/import
+    excel_file = create_test_excel_file()
+    response = client.post(
+        "/admin/import",
+        headers={"Authorization": f"Bearer {admin_key}"},
+        files={"file": ("test.xlsx", excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        data={"year": "2025"}
+    )
+    assert response.status_code == 201, f"Import start failed: {response.text}"
+    data = response.json()
+    import_id = data["import_id"]
+
+    # Step 2: Immediately GET /admin/import/status/{import_id}
+    status_response = client.get(
+        f"/admin/import/status/{import_id}",
+        headers={"Authorization": f"Bearer {admin_key}"}
+    )
+
+    # Step 3: Verify status shows processing or completed
+    assert status_response.status_code == 200, f"Status check failed: {status_response.text}"
+    status_data = status_response.json()
+    assert "status" in status_data, "Response should contain status field"
+    assert status_data["status"] in ["processing", "completed", "failed"], \
+        f"Status should be processing/completed/failed, got: {status_data['status']}"
+
+    # Step 4: Wait for completion
+    max_attempts = 10
+    poll_interval = 0.5
+    final_status = None
+
+    for attempt in range(max_attempts):
+        status_response = client.get(
+            f"/admin/import/status/{import_id}",
+            headers={"Authorization": f"Bearer {admin_key}"}
+        )
+        assert status_response.status_code == 200, f"Status check failed: {status_response.text}"
+        status_data = status_response.json()
+
+        if status_data["status"] == "completed":
+            final_status = status_data
+            break
+        elif status_data["status"] == "failed":
+            pytest.fail(f"Import failed: {status_data.get('error', 'Unknown error')}")
+
+        time.sleep(poll_interval)
+
+    assert final_status is not None, "Import did not complete within expected time"
+
+    # Step 5: Verify final status shows completed with record count
+    assert final_status["status"] == "completed", f"Expected completed status, got {final_status['status']}"
+    assert "records_imported" in final_status, "Final status should contain records_imported"
+    assert final_status["records_imported"] > 0, "Should have imported at least 1 record"
+    assert "import_id" in final_status, "Status should include import_id"
+    assert final_status["import_id"] == import_id, "Import ID should match"
+
+
 def test_admin_import_status_returns_404_for_nonexistent_id(client):
     """Test #68: GET /admin/import/status returns 404 for non-existent import_id."""
     from tests.conftest import TestingSessionLocal

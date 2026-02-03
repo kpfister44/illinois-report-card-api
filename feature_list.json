@@ -808,7 +808,7 @@
       "Step 4: Wait for completion",
       "Step 5: Verify final status shows completed with record count"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
