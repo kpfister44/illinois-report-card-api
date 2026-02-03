@@ -785,3 +785,58 @@ def test_admin_list_api_keys(client):
     prefixes = [k["key_prefix"] for k in keys_list]
     assert "test_key" in prefixes, "test_key_1 should be in the list"
     assert "user1@example.com" in [k["owner_email"] for k in keys_list], "user1 should be in the list"
+
+
+def test_admin_delete_api_key(client):
+    """Test #72: Admin endpoint DELETE /admin/keys/{id} revokes API key."""
+    from tests.conftest import TestingSessionLocal
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+
+        # Step 1: Create a test API key
+        test_key = "test_key_to_delete"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="delete_test@example.com",
+            owner_name="Delete Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+        db.refresh(api_key)
+        key_id = api_key.id
+    finally:
+        db.close()
+
+    # Step 2: Verify the key works for authentication
+    response = client.get("/years", headers={"Authorization": f"Bearer {test_key}"})
+    assert response.status_code == 200, f"Test key should work before deletion, got {response.status_code}"
+
+    # Step 3: Send DELETE to /admin/keys/{key_id} with admin key
+    delete_response = client.delete(
+        f"/admin/keys/{key_id}",
+        headers={"Authorization": f"Bearer {admin_key}"}
+    )
+
+    # Step 4: Verify response status code is 200
+    assert delete_response.status_code == 200, f"Expected 200, got {delete_response.status_code}: {delete_response.text}"
+
+    # Step 5: Verify key no longer works for authentication (401)
+    auth_response = client.get("/years", headers={"Authorization": f"Bearer {test_key}"})
+    assert auth_response.status_code == 401, f"Revoked key should return 401, got {auth_response.status_code}"
+
+    # Step 6: Verify key still exists in database with is_active=false
+    db2 = TestingSessionLocal()
+    try:
+        revoked_key = db2.query(APIKey).filter(APIKey.id == key_id).first()
+        assert revoked_key is not None, "Key should still exist in database"
+        assert revoked_key.is_active == False, "Key should be marked as inactive"
+    finally:
+        db2.close()

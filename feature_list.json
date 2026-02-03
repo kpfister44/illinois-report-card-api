@@ -901,7 +901,7 @@
       "Step 5: Verify key no longer works for authentication (401)",
       "Step 6: Verify key still exists in database with is_active=false"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

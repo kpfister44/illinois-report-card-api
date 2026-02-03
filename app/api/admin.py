@@ -129,6 +129,38 @@ async def list_api_keys(
     return {"data": keys_list}
 
 
+@router.delete("/keys/{key_id}")
+async def delete_api_key(
+    key_id: int,
+    db: Session = Depends(get_db),
+    admin_key: APIKeyModel = Depends(verify_admin_api_key)
+):
+    """
+    Revoke an API key (admin only).
+
+    Sets is_active to False. The key remains in the database for audit purposes
+    but can no longer be used for authentication.
+    """
+    # Find the API key
+    api_key = db.query(APIKeyModel).filter(APIKeyModel.id == key_id).first()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NOT_FOUND", "message": f"API key not found: {key_id}"}
+        )
+
+    # Revoke the key by setting is_active to False
+    api_key.is_active = False
+    db.commit()
+
+    return {
+        "message": "API key revoked successfully",
+        "key_id": key_id,
+        "key_prefix": api_key.key_prefix
+    }
+
+
 @router.post("/import", status_code=201)
 async def import_excel_file(
     file: UploadFile = File(...),
