@@ -785,7 +785,7 @@
       "Step 9: Verify schema_metadata populated with column info",
       "Step 10: Verify entities_master updated with new entities"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

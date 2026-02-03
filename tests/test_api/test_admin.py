@@ -3,6 +3,10 @@
 
 import pytest
 import hashlib
+import tempfile
+from pathlib import Path
+from io import BytesIO
+import openpyxl
 from app.models.database import APIKey, UsageLog
 
 
@@ -124,5 +128,145 @@ def test_usage_logging_captures_all_requests(client):
 
         # Step 5: Verify ip_address captured
         assert usage_log.ip_address is not None
+    finally:
+        db2.close()
+
+
+def create_test_excel_file() -> BytesIO:
+    """Helper to create a minimal test Excel file with school data."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "General"
+
+    # Add headers
+    headers = ["RCDTS", "School Name", "City", "County", "Student Enrollment"]
+    ws.append(headers)
+
+    # Add sample data rows
+    ws.append(["01-016-0001-17-0001", "Test Import School 1", "Chicago", "Cook", "500"])
+    ws.append(["02-016-0002-17-0002", "Test Import School 2", "Springfield", "Sangamon", "300"])
+    ws.append(["03-016-0003-17-0003", "Test Import School 3", "Naperville", "DuPage", "450"])
+
+    # Save to BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+
+def test_admin_import_uploads_and_processes_excel_file(client):
+    """Test #63: Admin endpoint POST /admin/import uploads and processes Excel file."""
+    from tests.conftest import TestingSessionLocal
+    from sqlalchemy import text, inspect
+    from app.models.database import SchemaMetadata, EntitiesMaster
+    import time
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+    finally:
+        db.close()
+
+    # Step 1: Create test Excel file with sample school data
+    excel_file = create_test_excel_file()
+
+    # Step 2 & 3: Send authenticated POST to /admin/import with multipart/form-data
+    response = client.post(
+        "/admin/import",
+        headers={"Authorization": f"Bearer {admin_key}"},
+        files={"file": ("test_schools.xlsx", excel_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        data={"year": "2025"}
+    )
+
+    # Step 4: Verify response status code is 201
+    assert response.status_code == 201, f"Expected 201, got {response.status_code}: {response.text}"
+    data = response.json()
+
+    # Step 5: Verify response has import_id and status: processing
+    assert "import_id" in data, "Response should contain import_id"
+    assert "status" in data, "Response should contain status"
+    import_id = data["import_id"]
+    assert data["status"] in ["processing", "completed"], f"Expected status processing/completed, got {data['status']}"
+
+    # Step 6: Poll /admin/import/status/{import_id} until complete
+    max_attempts = 10
+    poll_interval = 0.5  # seconds
+    final_status = None
+
+    for attempt in range(max_attempts):
+        status_response = client.get(
+            f"/admin/import/status/{import_id}",
+            headers={"Authorization": f"Bearer {admin_key}"}
+        )
+        assert status_response.status_code == 200, f"Status check failed: {status_response.text}"
+        status_data = status_response.json()
+
+        if status_data["status"] == "completed":
+            final_status = status_data
+            break
+        elif status_data["status"] == "failed":
+            pytest.fail(f"Import failed: {status_data.get('error', 'Unknown error')}")
+
+        time.sleep(poll_interval)
+
+    assert final_status is not None, "Import did not complete within expected time"
+
+    # Step 7: Verify final status shows records_imported count
+    assert "records_imported" in final_status, "Final status should contain records_imported"
+    assert final_status["records_imported"] == 3, f"Expected 3 records imported, got {final_status['records_imported']}"
+
+    # Step 8: Verify schools_2025 table contains imported data
+    db2 = TestingSessionLocal()
+    try:
+        # Check table exists
+        inspector = inspect(db2.bind)
+        table_names = inspector.get_table_names()
+        assert "schools_2025" in table_names, "schools_2025 table should exist"
+
+        # Query data from schools_2025
+        query = text("SELECT rcdts, school_name, city, county, student_enrollment FROM schools_2025")
+        result = db2.execute(query)
+        rows = result.fetchall()
+
+        # Verify 3 schools imported
+        assert len(rows) >= 3, f"Expected at least 3 schools, found {len(rows)}"
+
+        # Verify specific test data
+        rcdts_list = [row[0] for row in rows]
+        assert "01-016-0001-17-0001" in rcdts_list, "First test school should be imported"
+        assert "02-016-0002-17-0002" in rcdts_list, "Second test school should be imported"
+        assert "03-016-0003-17-0003" in rcdts_list, "Third test school should be imported"
+
+        # Step 9: Verify schema_metadata populated with column info
+        metadata_entries = db2.query(SchemaMetadata).filter(
+            SchemaMetadata.year == 2025,
+            SchemaMetadata.table_name == "schools_2025"
+        ).all()
+
+        assert len(metadata_entries) > 0, "Schema metadata should be populated"
+
+        # Verify some expected columns are documented
+        column_names = [entry.column_name for entry in metadata_entries]
+        assert "rcdts" in column_names, "RCDTS column should be in schema metadata"
+        assert "school_name" in column_names, "School Name column should be in schema metadata"
+
+        # Step 10: Verify entities_master updated with new entities
+        entities = db2.query(EntitiesMaster).filter(
+            EntitiesMaster.rcdts.in_([
+                "01-016-0001-17-0001",
+                "02-016-0002-17-0002",
+                "03-016-0003-17-0003"
+            ])
+        ).all()
+
+        assert len(entities) == 3, f"Expected 3 entities in entities_master, found {len(entities)}"
+
+        # Verify entity details
+        entity_names = {e.name for e in entities}
+        assert "Test Import School 1" in entity_names, "First school should be in entities_master"
+        assert "Test Import School 2" in entity_names, "Second school should be in entities_master"
+        assert "Test Import School 3" in entity_names, "Third school should be in entities_master"
+
     finally:
         db2.close()

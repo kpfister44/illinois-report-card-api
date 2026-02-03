@@ -70,3 +70,19 @@ class SchemaMetadata(Base):
     description = Column(Text)
     source_column_name = Column(Text)  # Original Excel column name
     is_suppressed_indicator = Column(Boolean, default=False)  # Marks columns that use * for privacy
+
+
+class ImportJob(Base):
+    """Tracks data import operations."""
+    __tablename__ = "import_jobs"
+
+    id = Column(Integer, primary_key=True)
+    import_id = Column(String(50), unique=True, nullable=False, index=True)  # Format: imp_xxxxxxxx
+    year = Column(Integer, nullable=False)
+    filename = Column(Text)
+    status = Column(String(20), nullable=False)  # processing | completed | failed
+    records_imported = Column(Integer, default=0)
+    error_message = Column(Text)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime)
+    api_key_id = Column(Integer, ForeignKey("api_keys.id"))
