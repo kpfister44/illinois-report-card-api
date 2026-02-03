@@ -182,7 +182,20 @@ async def import_excel_file(
             })
 
         # Create year-partitioned table
+        # If table exists, drop it to replace data (not append)
         table_name = f"schools_{year}"
+        from sqlalchemy import inspect as sqla_inspect
+        inspector = sqla_inspect(db.bind)
+        if table_name in inspector.get_table_names():
+            # Drop existing table
+            db.execute(text(f"DROP TABLE {table_name}"))
+            # Delete old schema metadata
+            db.query(SchemaMetadata).filter(
+                SchemaMetadata.year == year,
+                SchemaMetadata.table_name == table_name
+            ).delete()
+            db.commit()
+
         create_year_table(year, "schools", schema_list, db.bind)
 
         # Insert data

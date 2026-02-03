@@ -860,7 +860,7 @@
       "Step 7: Verify schema_metadata is updated if columns changed",
       "Step 8: Verify entities_master is updated with any new entities"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

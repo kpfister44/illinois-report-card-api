@@ -473,6 +473,136 @@ def test_admin_import_handles_corrupt_excel_file(client):
         db2.close()
 
 
+def test_reimporting_year_replaces_previous_data(client):
+    """Test #69: Re-importing data for an existing year replaces previous data."""
+    from tests.conftest import TestingSessionLocal
+    from sqlalchemy import text, inspect
+    from app.models.database import SchemaMetadata, EntitiesMaster
+    import time
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+    finally:
+        db.close()
+
+    # Step 1: Import 2025 data with 3 schools (using test helper)
+    excel_file_1 = create_test_excel_file()
+    response_1 = client.post(
+        "/admin/import",
+        headers={"Authorization": f"Bearer {admin_key}"},
+        files={"file": ("test1.xlsx", excel_file_1, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        data={"year": "2025"}
+    )
+    assert response_1.status_code == 201, f"First import failed: {response_1.text}"
+
+    # Wait for first import to complete
+    import_id_1 = response_1.json()["import_id"]
+    max_attempts = 10
+    for _ in range(max_attempts):
+        status_response = client.get(
+            f"/admin/import/status/{import_id_1}",
+            headers={"Authorization": f"Bearer {admin_key}"}
+        )
+        if status_response.json()["status"] == "completed":
+            break
+        time.sleep(0.5)
+
+    # Step 2: Verify schools_2025 table has 3 records
+    db2 = TestingSessionLocal()
+    try:
+        query = text("SELECT COUNT(*) FROM schools_2025")
+        result = db2.execute(query)
+        count_before = result.scalar()
+        assert count_before == 3, f"Expected 3 schools after first import, got {count_before}"
+
+        # Get RCDTSs from first import
+        query = text("SELECT rcdts FROM schools_2025 ORDER BY rcdts")
+        result = db2.execute(query)
+        rcdts_before = [row[0] for row in result.fetchall()]
+        assert len(rcdts_before) == 3, "Should have 3 RCDTSs"
+    finally:
+        db2.close()
+
+    # Step 3: Create a modified Excel file with 5 schools for 2025
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "General"
+    headers = ["RCDTS", "School Name", "City", "County", "Student Enrollment"]
+    ws.append(headers)
+    # Add 5 different schools
+    ws.append(["10-016-0010-17-0010", "Reimport School 1", "Chicago", "Cook", "600"])
+    ws.append(["11-016-0011-17-0011", "Reimport School 2", "Aurora", "Kane", "400"])
+    ws.append(["12-016-0012-17-0012", "Reimport School 3", "Peoria", "Peoria", "350"])
+    ws.append(["13-016-0013-17-0013", "Reimport School 4", "Rockford", "Winnebago", "550"])
+    ws.append(["14-016-0014-17-0014", "Reimport School 5", "Joliet", "Will", "500"])
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    excel_file_2 = output
+
+    # Step 4: Re-import 2025 data with the modified file
+    response_2 = client.post(
+        "/admin/import",
+        headers={"Authorization": f"Bearer {admin_key}"},
+        files={"file": ("test2.xlsx", excel_file_2, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        data={"year": "2025"}
+    )
+
+    # Step 5: Verify import completes successfully
+    assert response_2.status_code == 201, f"Second import failed: {response_2.text}"
+    import_id_2 = response_2.json()["import_id"]
+
+    # Wait for second import to complete
+    for _ in range(max_attempts):
+        status_response = client.get(
+            f"/admin/import/status/{import_id_2}",
+            headers={"Authorization": f"Bearer {admin_key}"}
+        )
+        if status_response.json()["status"] == "completed":
+            break
+        time.sleep(0.5)
+
+    # Step 6: Verify schools_2025 table now has 5 records (replaced, not appended)
+    db3 = TestingSessionLocal()
+    try:
+        query = text("SELECT COUNT(*) FROM schools_2025")
+        result = db3.execute(query)
+        count_after = result.scalar()
+        assert count_after == 5, f"Expected 5 schools after re-import (replaced), got {count_after}"
+
+        # Verify the new RCDTSs are from the second import
+        query = text("SELECT rcdts FROM schools_2025 ORDER BY rcdts")
+        result = db3.execute(query)
+        rcdts_after = [row[0] for row in result.fetchall()]
+        assert len(rcdts_after) == 5, "Should have 5 RCDTSs after re-import"
+
+        # Verify these are the NEW schools, not the old ones
+        assert "10-016-0010-17-0010" in rcdts_after, "Should have first reimport school"
+        assert "14-016-0014-17-0014" in rcdts_after, "Should have last reimport school"
+        assert "01-016-0001-17-0001" not in rcdts_after, "Should NOT have first original school (data replaced)"
+
+        # Step 7: Verify schema_metadata is updated
+        metadata_count = db3.query(SchemaMetadata).filter(
+            SchemaMetadata.year == 2025,
+            SchemaMetadata.table_name == "schools_2025"
+        ).count()
+        assert metadata_count > 0, "Schema metadata should exist after re-import"
+
+        # Step 8: Verify entities_master is updated with new entities
+        new_entities = db3.query(EntitiesMaster).filter(
+            EntitiesMaster.rcdts.in_([
+                "10-016-0010-17-0010",
+                "14-016-0014-17-0014"
+            ])
+        ).all()
+        assert len(new_entities) == 2, "New entities should be in entities_master"
+
+    finally:
+        db3.close()
+
+
 def test_admin_import_status_returns_404_for_nonexistent_id(client):
     """Test #68: GET /admin/import/status returns 404 for non-existent import_id."""
     from tests.conftest import TestingSessionLocal
