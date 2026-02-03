@@ -915,7 +915,7 @@
       "Step 6: Filter with ?api_key_id",
       "Step 7: Verify only that key's usage shown"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

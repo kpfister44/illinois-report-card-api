@@ -840,3 +840,98 @@ def test_admin_delete_api_key(client):
         assert revoked_key.is_active == False, "Key should be marked as inactive"
     finally:
         db2.close()
+
+
+def test_admin_usage_statistics(client):
+    """Test #73: Admin endpoint GET /admin/usage returns usage statistics."""
+    from tests.conftest import TestingSessionLocal
+    from datetime import datetime, timedelta
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+
+        # Create a test API key
+        test_key = "test_key_usage_stats"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        test_api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="usage_test@example.com",
+            owner_name="Usage Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(test_api_key)
+        db.commit()
+        db.refresh(test_api_key)
+        test_key_id = test_api_key.id
+    finally:
+        db.close()
+
+    # Step 1: Make several API requests with different keys
+    # Make requests with test key
+    client.get("/years", headers={"Authorization": f"Bearer {test_key}"})
+    client.get("/years", headers={"Authorization": f"Bearer {test_key}"})
+    client.get("/search?q=test", headers={"Authorization": f"Bearer {test_key}"})
+
+    # Make requests with admin key
+    client.get("/years", headers={"Authorization": f"Bearer {admin_key}"})
+
+    # Step 2: Send authenticated GET to /admin/usage with admin key
+    response = client.get(
+        "/admin/usage",
+        headers={"Authorization": f"Bearer {admin_key}"}
+    )
+
+    # Step 3: Verify response contains usage statistics
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "data" in data, "Response should contain data field"
+    usage_logs = data["data"]
+    assert isinstance(usage_logs, list), "data should be a list"
+    assert len(usage_logs) >= 4, f"Should have at least 4 usage logs, got {len(usage_logs)}"
+
+    # Verify each log has required fields
+    for log in usage_logs:
+        assert "api_key_id" in log, "Each log should have api_key_id"
+        assert "endpoint" in log, "Each log should have endpoint"
+        assert "method" in log, "Each log should have method"
+        assert "status_code" in log, "Each log should have status_code"
+        assert "timestamp" in log, "Each log should have timestamp"
+
+    # Step 4: Filter with ?start_date and ?end_date
+    now = datetime.utcnow()
+    start_date = (now - timedelta(hours=1)).isoformat()
+    end_date = now.isoformat()
+
+    filtered_response = client.get(
+        f"/admin/usage?start_date={start_date}&end_date={end_date}",
+        headers={"Authorization": f"Bearer {admin_key}"}
+    )
+
+    # Step 5: Verify date filtering works correctly
+    assert filtered_response.status_code == 200, f"Expected 200, got {filtered_response.status_code}"
+    filtered_data = filtered_response.json()
+    assert "data" in filtered_data, "Filtered response should contain data"
+    filtered_logs = filtered_data["data"]
+    assert len(filtered_logs) >= 4, f"Should have logs in date range, got {len(filtered_logs)}"
+
+    # Step 6: Filter with ?api_key_id
+    key_filtered_response = client.get(
+        f"/admin/usage?api_key_id={test_key_id}",
+        headers={"Authorization": f"Bearer {admin_key}"}
+    )
+
+    # Step 7: Verify only that key's usage shown
+    assert key_filtered_response.status_code == 200, f"Expected 200, got {key_filtered_response.status_code}"
+    key_filtered_data = key_filtered_response.json()
+    assert "data" in key_filtered_data, "Key filtered response should contain data"
+    key_logs = key_filtered_data["data"]
+    assert len(key_logs) == 3, f"Should have exactly 3 logs for test key, got {len(key_logs)}"
+
+    # Verify all logs are for the test key
+    for log in key_logs:
+        assert log["api_key_id"] == test_key_id, f"All logs should be for test_key_id {test_key_id}, got {log['api_key_id']}"

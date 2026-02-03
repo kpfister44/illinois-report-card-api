@@ -161,6 +161,72 @@ async def delete_api_key(
     }
 
 
+@router.get("/usage")
+async def get_usage_statistics(
+    start_date: str = None,
+    end_date: str = None,
+    api_key_id: int = None,
+    db: Session = Depends(get_db),
+    admin_key: APIKeyModel = Depends(verify_admin_api_key)
+):
+    """
+    Get usage statistics (admin only).
+
+    Returns usage logs with optional filtering by date range and/or API key.
+    """
+    from app.models.database import UsageLog
+    from datetime import datetime
+
+    # Start with base query
+    query = db.query(UsageLog)
+
+    # Apply filters
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(UsageLog.timestamp >= start_dt)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_DATE", "message": "Invalid start_date format. Use ISO format."}
+            )
+
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(UsageLog.timestamp <= end_dt)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "INVALID_DATE", "message": "Invalid end_date format. Use ISO format."}
+            )
+
+    if api_key_id is not None:
+        query = query.filter(UsageLog.api_key_id == api_key_id)
+
+    # Order by timestamp descending (most recent first)
+    query = query.order_by(UsageLog.timestamp.desc())
+
+    # Execute query
+    usage_logs = query.all()
+
+    # Format response
+    logs_list = []
+    for log in usage_logs:
+        logs_list.append({
+            "id": log.id,
+            "api_key_id": log.api_key_id,
+            "endpoint": log.endpoint,
+            "method": log.method,
+            "status_code": log.status_code,
+            "response_time_ms": log.response_time_ms,
+            "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+            "ip_address": log.ip_address
+        })
+
+    return {"data": logs_list}
+
+
 @router.post("/import", status_code=201)
 async def import_excel_file(
     file: UploadFile = File(...),
