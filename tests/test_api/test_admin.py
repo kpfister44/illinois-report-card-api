@@ -935,3 +935,83 @@ def test_admin_usage_statistics(client):
     # Verify all logs are for the test key
     for log in key_logs:
         assert log["api_key_id"] == test_key_id, f"All logs should be for test_key_id {test_key_id}, got {log['api_key_id']}"
+
+
+def test_rate_limit_tiers_enforce_different_limits(client):
+    """Test #74: Different rate limit tiers enforce different limits."""
+    from tests.conftest import TestingSessionLocal
+    import time
+
+    db = TestingSessionLocal()
+    try:
+        # Step 1: Create free tier key (100 req/min)
+        free_key = "free_tier_key_12345"
+        free_key_hash = hashlib.sha256(free_key.encode()).hexdigest()
+        free_api_key = APIKey(
+            key_hash=free_key_hash,
+            key_prefix=free_key[:8],
+            owner_email="free@example.com",
+            owner_name="Free User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(free_api_key)
+
+        # Step 2: Create standard tier key (1000 req/min)
+        standard_key = "standard_tier_key_123"
+        standard_key_hash = hashlib.sha256(standard_key.encode()).hexdigest()
+        standard_api_key = APIKey(
+            key_hash=standard_key_hash,
+            key_prefix=standard_key[:8],
+            owner_email="standard@example.com",
+            owner_name="Standard User",
+            is_active=True,
+            rate_limit_tier="standard",
+            is_admin=False
+        )
+        db.add(standard_api_key)
+
+        # Step 3: Create premium tier key (10000 req/min)
+        premium_key = "premium_tier_key_123"
+        premium_key_hash = hashlib.sha256(premium_key.encode()).hexdigest()
+        premium_api_key = APIKey(
+            key_hash=premium_key_hash,
+            key_prefix=premium_key[:8],
+            owner_email="premium@example.com",
+            owner_name="Premium User",
+            is_active=True,
+            rate_limit_tier="premium",
+            is_admin=False
+        )
+        db.add(premium_api_key)
+
+        db.commit()
+    finally:
+        db.close()
+
+    # Step 4: Verify free key hits limit at 100
+    # Make 100 requests with free key (should all succeed)
+    for i in range(100):
+        response = client.get("/years", headers={"Authorization": f"Bearer {free_key}"})
+        assert response.status_code == 200, f"Request {i+1}/100 should succeed, got {response.status_code}"
+
+    # 101st request should be rate limited
+    response = client.get("/years", headers={"Authorization": f"Bearer {free_key}"})
+    assert response.status_code == 429, f"101st request should be rate limited, got {response.status_code}"
+    data = response.json()
+    assert data["code"] == "RATE_LIMITED", "Should return RATE_LIMITED error code"
+    assert "retry_after" in data, "Should include retry_after field"
+
+    # Step 5: Verify standard key can exceed 100 without limit
+    # Make 150 requests with standard key (should all succeed, well under 1000 limit)
+    for i in range(150):
+        response = client.get("/years", headers={"Authorization": f"Bearer {standard_key}"})
+        assert response.status_code == 200, f"Standard tier request {i+1}/150 should succeed, got {response.status_code}"
+
+    # Step 6: Verify each tier enforces its specific limit
+    # Premium tier should handle even more requests
+    # Make 200 requests with premium key (should all succeed, well under 10000 limit)
+    for i in range(200):
+        response = client.get("/years", headers={"Authorization": f"Bearer {premium_key}"})
+        assert response.status_code == 200, f"Premium tier request {i+1}/200 should succeed, got {response.status_code}"
