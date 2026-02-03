@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.dependencies import verify_api_key
 from app.database import get_db
 from app.models.database import APIKey
+from app.models.errors import AUTH_REQUIRED, INVALID_YEAR
 
 router = APIRouter()
 
@@ -32,7 +33,15 @@ def sanitize_fts5_query(query: str) -> str:
     return f'"{query}"'
 
 
-@router.get("/search")
+@router.get("/search", responses={
+    200: {"description": "Search results", "content": {"application/json": {"example": {
+        "data": [
+            {"rcdts": "17-099-0070-0050", "entity_type": "school", "name": "Abraham Lincoln Elementary", "city": "Chicago", "county": "Cook"},
+        ],
+        "meta": {"total": 1, "limit": 10, "query": "Lincoln"}
+    }}}},
+    **INVALID_YEAR, **AUTH_REQUIRED,
+})
 async def search(
     q: str,
     type: str = None,

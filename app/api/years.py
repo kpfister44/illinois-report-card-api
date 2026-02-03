@@ -5,11 +5,18 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import inspect
 from app.dependencies import verify_api_key, get_db
 from app.models.database import APIKey
+from app.models.errors import AUTH_REQUIRED
 
 router = APIRouter()
 
 
-@router.get("/years")
+@router.get("/years", responses={
+    200: {"description": "List of available years", "content": {"application/json": {"example": {
+        "data": [2024, 2023, 2022],
+        "meta": {"count": 3}
+    }}}},
+    **AUTH_REQUIRED,
+})
 async def get_years(api_key: APIKey = Depends(verify_api_key), db = Depends(get_db)):
     """Returns list of all available data years."""
     # Query database for all year-partitioned tables

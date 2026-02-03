@@ -3,17 +3,28 @@
 
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.dependencies import verify_api_key, get_db
 from app.models.database import APIKey
+from app.models.errors import AUTH_REQUIRED, INVALID_YEAR
 from app.services.table_manager import get_year_table
 
 router = APIRouter()
 
 
 class QueryRequest(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "year": 2024,
+        "entity_type": "school",
+        "fields": ["school_name", "rcdts", "city"],
+        "filters": {"city": "Chicago"},
+        "sort": {"field": "school_name", "order": "ASC"},
+        "limit": 10,
+        "offset": 0,
+    }})
+
     year: int
     entity_type: str
     fields: Optional[List[str]] = None
@@ -23,7 +34,13 @@ class QueryRequest(BaseModel):
     offset: Optional[int] = 0
 
 
-@router.post("/query")
+@router.post("/query", responses={
+    200: {"description": "Query results with pagination", "content": {"application/json": {"example": {
+        "data": [{"school_name": "Abraham Lincoln Elementary", "rcdts": "17-099-0070-0050", "city": "Chicago"}],
+        "meta": {"total": 42, "limit": 10, "offset": 0}
+    }}}},
+    **INVALID_YEAR, **AUTH_REQUIRED,
+})
 async def query(
     request: QueryRequest,
     api_key: APIKey = Depends(verify_api_key),

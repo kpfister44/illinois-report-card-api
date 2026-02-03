@@ -7,13 +7,14 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.database import get_db
 from app.dependencies import verify_api_key
 from app.models.database import APIKey as APIKeyModel, ImportJob, SchemaMetadata, EntitiesMaster
+from app.models.errors import ADMIN_REQUIRED, NOT_FOUND
 from app.utils.excel_parser import parse_excel_file
 from app.utils.schema_detector import detect_column_type, detect_column_category
 from app.utils.data_cleaners import clean_percentage, clean_enrollment, handle_suppressed, normalize_column_name
@@ -24,6 +25,13 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 class CreateAPIKeyRequest(BaseModel):
     """Request body for creating a new API key."""
+    model_config = ConfigDict(json_schema_extra={"example": {
+        "owner_email": "user@example.com",
+        "owner_name": "Jane Smith",
+        "rate_limit_tier": "standard",
+        "is_admin": False,
+    }})
+
     owner_email: str
     owner_name: str
     rate_limit_tier: str = "free"
@@ -52,7 +60,14 @@ def verify_admin_api_key(
     return api_key
 
 
-@router.post("/keys", status_code=201, response_model=CreateAPIKeyResponse)
+@router.post("/keys", status_code=201, response_model=CreateAPIKeyResponse, responses={
+    201: {"description": "API key created", "content": {"application/json": {"example": {
+        "api_key": "rc_live_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        "key_prefix": "rc_live_", "owner_email": "user@example.com",
+        "owner_name": "Jane Smith", "rate_limit_tier": "standard", "is_admin": False,
+    }}}},
+    **ADMIN_REQUIRED,
+})
 async def create_api_key(
     request: CreateAPIKeyRequest,
     db: Session = Depends(get_db),
@@ -97,7 +112,14 @@ async def create_api_key(
     )
 
 
-@router.get("/keys")
+@router.get("/keys", responses={
+    200: {"description": "List of all API keys", "content": {"application/json": {"example": {
+        "data": [{"id": 1, "key_prefix": "rc_live_", "owner_email": "user@example.com",
+                 "owner_name": "Jane Smith", "is_active": True, "rate_limit_tier": "standard",
+                 "is_admin": False, "created_at": "2024-01-15T10:30:00", "last_used_at": "2024-06-01T14:22:00"}]
+    }}}},
+    **ADMIN_REQUIRED,
+})
 async def list_api_keys(
     db: Session = Depends(get_db),
     admin_key: APIKeyModel = Depends(verify_admin_api_key)
@@ -129,7 +151,12 @@ async def list_api_keys(
     return {"data": keys_list}
 
 
-@router.delete("/keys/{key_id}")
+@router.delete("/keys/{key_id}", responses={
+    200: {"description": "API key revoked", "content": {"application/json": {"example": {
+        "message": "API key revoked successfully", "key_id": 1, "key_prefix": "rc_live_"
+    }}}},
+    **ADMIN_REQUIRED, **NOT_FOUND,
+})
 async def delete_api_key(
     key_id: int,
     db: Session = Depends(get_db),
@@ -161,7 +188,13 @@ async def delete_api_key(
     }
 
 
-@router.get("/usage")
+@router.get("/usage", responses={
+    200: {"description": "Usage logs", "content": {"application/json": {"example": {
+        "data": [{"id": 42, "api_key_id": 1, "endpoint": "/schools/2024", "method": "GET",
+                 "status_code": 200, "response_time_ms": 15, "timestamp": "2024-06-01T14:22:00", "ip_address": "192.168.1.1"}]
+    }}}},
+    **ADMIN_REQUIRED,
+})
 async def get_usage_statistics(
     start_date: str = None,
     end_date: str = None,
@@ -226,7 +259,12 @@ async def get_usage_statistics(
     return {"data": logs_list}
 
 
-@router.post("/import", status_code=201)
+@router.post("/import", status_code=201, responses={
+    201: {"description": "Import completed", "content": {"application/json": {"example": {
+        "import_id": "imp_a1b2c3d4", "status": "completed", "year": 2024, "records_imported": 1542
+    }}}},
+    **ADMIN_REQUIRED,
+})
 async def import_excel_file(
     file: UploadFile = File(...),
     year: int = Form(...),
@@ -410,7 +448,14 @@ async def import_excel_file(
         )
 
 
-@router.get("/import/status/{import_id}")
+@router.get("/import/status/{import_id}", responses={
+    200: {"description": "Import job status", "content": {"application/json": {"example": {
+        "import_id": "imp_a1b2c3d4", "status": "completed", "year": 2024,
+        "filename": "report_2024.xlsx", "started_at": "2024-06-01T10:00:00",
+        "records_imported": 1542, "completed_at": "2024-06-01T10:00:05"
+    }}}},
+    **ADMIN_REQUIRED, **NOT_FOUND,
+})
 async def get_import_status(
     import_id: str,
     db: Session = Depends(get_db),

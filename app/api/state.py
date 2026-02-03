@@ -6,12 +6,19 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import text
 from app.dependencies import verify_api_key, get_db
 from app.models.database import APIKey
+from app.models.errors import AUTH_REQUIRED, INVALID_YEAR, NOT_FOUND
 from app.services.table_manager import get_year_table, get_available_years
 
 router = APIRouter()
 
 
-@router.get("/state/{year}")
+@router.get("/state/{year}", responses={
+    200: {"description": "State-level aggregate data", "content": {"application/json": {"example": {
+        "data": {"total_students": 1891622, "total_schools": 1542, "avg_reading_score": 45.2},
+        "meta": {"year": 2024}
+    }}}},
+    **INVALID_YEAR, **AUTH_REQUIRED, **NOT_FOUND,
+})
 async def get_state(
     year: int,
     fields: Optional[str] = Query(default=None),

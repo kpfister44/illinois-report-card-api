@@ -6,12 +6,19 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import text, inspect
 from app.dependencies import verify_api_key, get_db
 from app.models.database import APIKey
+from app.models.errors import AUTH_REQUIRED, INVALID_YEAR, NOT_FOUND
 from app.services.table_manager import get_year_table, get_available_years
 
 router = APIRouter()
 
 
-@router.get("/districts/{year}")
+@router.get("/districts/{year}", responses={
+    200: {"description": "Paginated list of districts", "content": {"application/json": {"example": {
+        "data": [{"rcdts": "17-099-0000-0000", "district_name": "Chicago Public Schools", "city": "Chicago", "county": "Cook"}],
+        "meta": {"total": 227, "limit": 100, "offset": 0}
+    }}}},
+    **INVALID_YEAR, **AUTH_REQUIRED,
+})
 async def get_districts(
     year: int,
     limit: int = Query(default=100, ge=1, le=1000),
@@ -111,7 +118,13 @@ async def get_districts(
     }
 
 
-@router.get("/districts/{year}/{rcdts}")
+@router.get("/districts/{year}/{rcdts}", responses={
+    200: {"description": "Single district record", "content": {"application/json": {"example": {
+        "data": {"rcdts": "17-099-0000-0000", "district_name": "Chicago Public Schools", "city": "Chicago"},
+        "meta": {"year": 2024, "rcdts": "17-099-0000-0000"}
+    }}}},
+    **INVALID_YEAR, **AUTH_REQUIRED, **NOT_FOUND,
+})
 async def get_district_by_rcdts(
     year: int,
     rcdts: str,
