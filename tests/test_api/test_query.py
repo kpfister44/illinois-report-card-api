@@ -634,3 +634,91 @@ def test_post_query_validates_request_body(client):
     # Verify error message mentions year or data not available
     message = data["message"]
     assert "year" in message.lower() or "data" in message.lower()
+
+
+def test_post_query_prevents_sql_injection(client):
+    """Test #62: POST /query prevents SQL injection through filter values."""
+    from tests.conftest import TestingSessionLocal, engine
+    from sqlalchemy import text
+    from app.services.table_manager import create_year_table
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_query_sqli_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create schools_2025 table with test data
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"}
+        ]
+        create_year_table(2025, "schools", schema, engine)
+
+        # Insert test data
+        insert_query = text("""
+            INSERT INTO schools_2025 (rcdts, school_name, city)
+            VALUES
+                ('01-016-0001-17-0001', 'Test School 1', 'Chicago'),
+                ('02-016-0002-17-0002', 'Test School 2', 'Springfield'),
+                ('03-016-0003-17-0003', 'Test School 3', 'Naperville')
+        """)
+        db.execute(insert_query)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Step 1: Send POST to /query with malicious SQL injection in filter value
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "filters": {"city": "Chicago'; DROP TABLE schools_2025; --"}
+        }
+    )
+
+    # Step 2: Verify no SQL injection occurs (should return 200, not 500)
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    data = response.json()
+
+    # Step 3: Verify query returns no results or empty array
+    # (since no city matches the malicious string exactly)
+    assert "data" in data
+    assert isinstance(data["data"], list)
+    assert len(data["data"]) == 0, "Should return empty results for non-matching city"
+
+    # Step 4: Verify schools_2025 table still exists and has data
+    db = TestingSessionLocal()
+    try:
+        # Verify table exists and has correct data
+        check_query = text("SELECT COUNT(*) as count FROM schools_2025")
+        result = db.execute(check_query)
+        count = result.scalar()
+
+        assert count == 3, f"Table should still have 3 schools, but has {count}"
+
+        # Verify specific test data is intact
+        verify_query = text("SELECT city FROM schools_2025 WHERE rcdts = '01-016-0001-17-0001'")
+        result = db.execute(verify_query)
+        row = result.fetchone()
+
+        assert row is not None, "Test data should still exist"
+        assert row[0] == "Chicago", "Test data should be unchanged"
+
+    finally:
+        db.close()

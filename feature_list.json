@@ -768,7 +768,7 @@
       "Step 3: Verify query returns no results or empty array",
       "Step 4: Verify schools_2025 table still exists and has data"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
