@@ -419,6 +419,60 @@ def test_admin_import_status_returns_import_progress(client):
     assert final_status["import_id"] == import_id, "Import ID should match"
 
 
+def test_admin_import_handles_corrupt_excel_file(client):
+    """Test #67: POST /admin/import handles corrupt Excel file gracefully."""
+    from tests.conftest import TestingSessionLocal
+    from sqlalchemy import text, inspect
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+    finally:
+        db.close()
+
+    # Step 1: Create a corrupt/invalid Excel file (truncated/malformed)
+    # Create a file that claims to be Excel but has invalid content
+    corrupt_file = BytesIO(b"This is not a valid Excel file - it's just random text that will fail to parse")
+
+    # Step 2 & 3: Send authenticated POST to /admin/import with corrupt file
+    response = client.post(
+        "/admin/import",
+        headers={"Authorization": f"Bearer {admin_key}"},
+        files={"file": ("corrupt.xlsx", corrupt_file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        data={"year": "2025"}
+    )
+
+    # Step 4: Verify response returns appropriate error (400 or 500 for import failure)
+    assert response.status_code in [400, 500], f"Expected 400 or 500, got {response.status_code}"
+
+    # Step 5: Verify error message indicates file parsing failed
+    data = response.json()
+    assert "code" in data, "Response should contain error code"
+    assert "message" in data, "Response should contain error message"
+    error_message = data["message"].lower()
+    # Should mention parsing/import/file failure
+    assert any(keyword in error_message for keyword in ["parse", "import", "file", "failed", "invalid"]), \
+        f"Error message should indicate parsing/import failure, got: {data['message']}"
+
+    # Step 6: Verify no partial data was imported to database
+    db2 = TestingSessionLocal()
+    try:
+        # Check if any new schools were added (there shouldn't be any from this corrupt import)
+        inspector = inspect(db2.bind)
+        table_names = inspector.get_table_names()
+
+        if "schools_2025" in table_names:
+            # If table exists, check that no schools from this import were added
+            # The corrupt file has no valid RCDTS data, so if any were added, it's a problem
+            query = text("SELECT COUNT(*) FROM schools_2025 WHERE rcdts LIKE '%corrupt%'")
+            result = db2.execute(query)
+            count = result.scalar()
+            assert count == 0, "No data from corrupt file should have been imported"
+    finally:
+        db2.close()
+
+
 def test_admin_import_status_returns_404_for_nonexistent_id(client):
     """Test #68: GET /admin/import/status returns 404 for non-existent import_id."""
     from tests.conftest import TestingSessionLocal

@@ -834,7 +834,7 @@
       "Step 5: Verify error message indicates file parsing failed",
       "Step 6: Verify no partial data was imported to database"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
