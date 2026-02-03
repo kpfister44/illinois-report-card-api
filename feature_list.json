@@ -888,7 +888,7 @@
       "Step 5: Verify full key is NOT exposed (security)",
       "Step 6: Verify is_active and rate_limit_tier fields present"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

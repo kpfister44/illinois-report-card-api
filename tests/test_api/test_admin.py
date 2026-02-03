@@ -692,3 +692,96 @@ def test_admin_import_status_returns_404_for_nonexistent_id(client):
     assert "message" in data, "Response should contain error message"
     assert data["code"] == "NOT_FOUND", f"Expected NOT_FOUND, got {data['code']}"
     assert nonexistent_id in data["message"], "Error message should include the requested import_id"
+
+
+def test_admin_list_api_keys(client):
+    """Test #71: Admin endpoint GET /admin/keys lists all API keys."""
+    from tests.conftest import TestingSessionLocal
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+
+        # Step 1: Create multiple API keys
+        # Create 3 test API keys with different properties
+        test_keys = [
+            {
+                "key": "test_key_1",
+                "owner_email": "user1@example.com",
+                "owner_name": "User One",
+                "rate_limit_tier": "free",
+                "is_active": True,
+                "is_admin": False
+            },
+            {
+                "key": "test_key_2",
+                "owner_email": "user2@example.com",
+                "owner_name": "User Two",
+                "rate_limit_tier": "standard",
+                "is_active": True,
+                "is_admin": False
+            },
+            {
+                "key": "test_key_3_inactive",
+                "owner_email": "user3@example.com",
+                "owner_name": "User Three",
+                "rate_limit_tier": "premium",
+                "is_active": False,
+                "is_admin": False
+            }
+        ]
+
+        for key_data in test_keys:
+            key_hash = hashlib.sha256(key_data["key"].encode()).hexdigest()
+            api_key = APIKey(
+                key_hash=key_hash,
+                key_prefix=key_data["key"][:8],
+                owner_email=key_data["owner_email"],
+                owner_name=key_data["owner_name"],
+                is_active=key_data["is_active"],
+                rate_limit_tier=key_data["rate_limit_tier"],
+                is_admin=key_data["is_admin"]
+            )
+            db.add(api_key)
+        db.commit()
+    finally:
+        db.close()
+
+    # Step 2: Send authenticated GET to /admin/keys with admin key
+    response = client.get(
+        "/admin/keys",
+        headers={"Authorization": f"Bearer {admin_key}"}
+    )
+
+    # Verify response status code is 200
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+
+    data = response.json()
+
+    # Step 3: Verify response contains list of all keys
+    assert "data" in data, "Response should contain data field"
+    keys_list = data["data"]
+    assert isinstance(keys_list, list), "data field should be a list"
+    assert len(keys_list) >= 4, f"Should have at least 4 keys (admin + 3 test keys), got {len(keys_list)}"
+
+    # Step 4: Verify each key shows key_prefix, owner_email, owner_name
+    for key_item in keys_list:
+        assert "key_prefix" in key_item, "Each key should have key_prefix field"
+        assert "owner_email" in key_item, "Each key should have owner_email field"
+        assert "owner_name" in key_item, "Each key should have owner_name field"
+
+        # Step 5: Verify full key is NOT exposed (security)
+        assert "api_key" not in key_item, "Full API key should NOT be exposed in list"
+        assert "key_hash" not in key_item, "Key hash should NOT be exposed in list"
+
+        # Step 6: Verify is_active and rate_limit_tier fields present
+        assert "is_active" in key_item, "Each key should have is_active field"
+        assert "rate_limit_tier" in key_item, "Each key should have rate_limit_tier field"
+        assert isinstance(key_item["is_active"], bool), "is_active should be boolean"
+        assert key_item["rate_limit_tier"] in ["free", "standard", "premium"], "rate_limit_tier should be valid"
+
+    # Verify our test keys are in the response
+    prefixes = [k["key_prefix"] for k in keys_list]
+    assert "test_key" in prefixes, "test_key_1 should be in the list"
+    assert "user1@example.com" in [k["owner_email"] for k in keys_list], "user1 should be in the list"

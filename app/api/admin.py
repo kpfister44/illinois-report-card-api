@@ -97,6 +97,38 @@ async def create_api_key(
     )
 
 
+@router.get("/keys")
+async def list_api_keys(
+    db: Session = Depends(get_db),
+    admin_key: APIKeyModel = Depends(verify_admin_api_key)
+):
+    """
+    List all API keys (admin only).
+
+    Returns a list of all API keys with metadata.
+    Full keys are never exposed - only key prefixes are shown.
+    """
+    # Query all API keys
+    api_keys = db.query(APIKeyModel).all()
+
+    # Format response - never expose full keys or hashes
+    keys_list = []
+    for key in api_keys:
+        keys_list.append({
+            "id": key.id,
+            "key_prefix": key.key_prefix,
+            "owner_email": key.owner_email,
+            "owner_name": key.owner_name,
+            "is_active": key.is_active,
+            "rate_limit_tier": key.rate_limit_tier,
+            "is_admin": key.is_admin,
+            "created_at": key.created_at.isoformat() if key.created_at else None,
+            "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None
+        })
+
+    return {"data": keys_list}
+
+
 @router.post("/import", status_code=201)
 async def import_excel_file(
     file: UploadFile = File(...),
