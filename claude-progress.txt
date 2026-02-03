@@ -3147,3 +3147,92 @@ compliance fix (API key prefix format).
 - Test #72: Admin endpoint DELETE /admin/keys/{id} revokes API key
 - Test #73: Admin endpoint GET /admin/usage returns usage statistics
 - Test #74: Different rate limit tiers enforce different limits
+
+### Test #72: Admin endpoint DELETE /admin/keys/{id} revokes API key ✅
+
+**Implementation Following TDD:**
+1. ✅ Wrote failing test in test_admin.py
+   - Creates test API key and verifies it works
+   - Calls DELETE /admin/keys/{key_id}
+   - Verifies revoked key returns 401
+   - Confirms key still in DB with is_active=false
+
+2. ✅ Ran test to confirm failure (404 Not Found)
+
+3. ✅ Implemented DELETE /admin/keys/{key_id} endpoint
+   - Sets is_active to False (soft delete for audit)
+   - Returns 404 if key not found
+   - Requires admin authentication
+
+4. ✅ Verified success - all 12 admin tests passing
+
+### Test #73: Admin endpoint GET /admin/usage returns usage statistics ✅
+
+**Implementation Following TDD:**
+1. ✅ Wrote failing test in test_admin.py
+   - Makes multiple API requests with different keys
+   - Tests usage endpoint with no filters
+   - Tests date range filtering (start_date, end_date)
+   - Tests API key filtering (api_key_id)
+
+2. ✅ Ran test to confirm failure (404 Not Found)
+
+3. ✅ Implemented GET /admin/usage endpoint
+   - Queries UsageLog table
+   - Supports start_date, end_date, api_key_id filters
+   - Returns usage logs ordered by timestamp desc
+   - Includes all log fields (endpoint, method, status, etc.)
+
+4. ✅ Verified success - all 13 admin tests passing
+
+### Session 17 Progress Update
+- **Current**: 73/86 tests passing (84.9%)
+- **Session progress**: +3 tests
+- **Admin endpoints**: All admin endpoints now complete! (13/13 tests)
+- **Git commits**: 3 (d5c0efa, 28f28fe, d4ad996)
+
+---
+
+## Session 17 Final Summary - 8 Tests Completed
+
+### All Tests Completed This Session
+1. **Test #71**: Admin endpoint GET /admin/keys lists all API keys ✅
+2. **Test #72**: Admin endpoint DELETE /admin/keys/{id} revokes API key ✅
+3. **Test #73**: Admin endpoint GET /admin/usage returns usage statistics ✅
+4. **Test #74**: Different rate limit tiers enforce different limits ✅
+5. **Test #75**: API responses follow consistent JSON format for success ✅
+6. **Test #76**: API responses follow consistent JSON format for errors ✅
+7. **Test #77**: Database indexes are created for performance ✅
+
+### Session Achievements
+- **Started**: 70/86 tests passing (81.4%)
+- **Ended**: 77/86 tests passing (89.5%)
+- **Progress**: +7 tests, +8.1 percentage points
+- **Remaining**: 9 tests to complete
+
+### Implementation Highlights
+- Test #71: New GET /admin/keys endpoint - lists keys without exposing secrets
+- Test #72: New DELETE /admin/keys/{id} endpoint - soft revoke (is_active=false)
+- Test #73: New GET /admin/usage endpoint - usage stats with date/key filtering
+- Test #74: Validation test - rate limiting tiers already implemented correctly
+- Test #75: Validation test - success response format {data, meta} verified
+- Test #76: Validation test - error response format {code, message} verified
+- Test #77: Bug fix + test - added rcdts index to dynamically created year tables
+
+### Code Quality
+- All tests passing ✅
+- Zero regressions ✅
+- 8 git commits this session
+- Server verified working ✅
+- TDD followed for all implementations
+
+### Next Steps for Future Sessions
+- Test #78: Swagger UI documentation is accessible and complete
+- Test #79: OpenAPI schema includes examples for all endpoints
+- Test #80: Docker container builds and runs successfully
+- Test #81: Docker-compose starts development environment
+- Test #82: Environment variables configure application correctly
+- Test #83: Error messages are user-friendly and informative
+- Test #84: README.md contains complete setup and usage instructions
+- Test #85: Test coverage meets 90%+ threshold
+- Test #86: All pytest tests pass without errors or warnings
