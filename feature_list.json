@@ -875,7 +875,7 @@
       "Step 7: Verify new key works for API authentication",
       "Step 8: Verify key stored as hash in database (not plaintext)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",

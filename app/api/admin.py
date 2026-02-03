@@ -65,8 +65,8 @@ async def create_api_key(
     Only the SHA-256 hash is stored in the database.
     """
     # Generate a secure random API key
-    # Format: rcapi_<32 random hex characters>
-    plaintext_key = f"rcapi_{secrets.token_hex(32)}"
+    # Format: rc_live_<32 random hex characters>
+    plaintext_key = f"rc_live_{secrets.token_hex(32)}"
 
     # Hash the key for storage
     key_hash = hashlib.sha256(plaintext_key.encode()).hexdigest()

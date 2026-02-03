@@ -603,6 +603,68 @@ def test_reimporting_year_replaces_previous_data(client):
         db3.close()
 
 
+def test_admin_create_api_key_endpoint(client):
+    """Test #70: Admin endpoint POST /admin/keys creates new API key."""
+    from tests.conftest import TestingSessionLocal
+
+    # Create admin API key
+    db = TestingSessionLocal()
+    try:
+        admin_key = create_admin_api_key(db)
+    finally:
+        db.close()
+
+    # Step 1 & 2: Send authenticated POST to /admin/keys with admin key
+    response = client.post(
+        "/admin/keys",
+        headers={"Authorization": f"Bearer {admin_key}"},
+        json={
+            "owner_email": "test@example.com",
+            "owner_name": "Test User",
+            "rate_limit_tier": "free"
+        }
+    )
+
+    # Step 3: Verify response status code is 201
+    assert response.status_code == 201, f"Expected 201, got {response.status_code}: {response.text}"
+
+    data = response.json()
+
+    # Step 4: Verify response contains full key (only returned once)
+    assert "api_key" in data, "Response should contain api_key field"
+    new_key = data["api_key"]
+    assert len(new_key) > 0, "API key should not be empty"
+
+    # Step 5: Verify key starts with rc_live_ prefix
+    assert new_key.startswith("rc_live_"), f"API key should start with rc_live_, got: {new_key}"
+
+    # Step 6: Verify response contains key_prefix
+    assert "key_prefix" in data, "Response should contain key_prefix field"
+    assert data["key_prefix"] == new_key[:8], "key_prefix should be first 8 characters of key"
+    assert data["key_prefix"] == "rc_live_", "key_prefix should be rc_live_"
+
+    # Step 7: Verify new key works for API authentication
+    auth_response = client.get("/years", headers={"Authorization": f"Bearer {new_key}"})
+    assert auth_response.status_code == 200, f"New API key should work for authentication, got {auth_response.status_code}"
+
+    # Step 8: Verify key stored as hash in database (not plaintext)
+    db2 = TestingSessionLocal()
+    try:
+        from app.models.database import APIKey
+        api_key_record = db2.query(APIKey).filter(APIKey.key_prefix == new_key[:8]).first()
+        assert api_key_record is not None, "API key should be in database"
+
+        # Verify it's hashed (SHA-256 is 64 hex characters)
+        assert len(api_key_record.key_hash) == 64, "Hash should be SHA-256 (64 hex chars)"
+        assert api_key_record.key_hash != new_key, "Database should store hash, not plaintext"
+
+        # Verify the hash matches
+        expected_hash = hashlib.sha256(new_key.encode()).hexdigest()
+        assert api_key_record.key_hash == expected_hash, "Stored hash should match SHA-256 of key"
+    finally:
+        db2.close()
+
+
 def test_admin_import_status_returns_404_for_nonexistent_id(client):
     """Test #68: GET /admin/import/status returns 404 for non-existent import_id."""
     from tests.conftest import TestingSessionLocal
