@@ -940,7 +940,7 @@
       "Step 4: Send POST /query and verify consistent structure",
       "Step 5: Verify all responses include appropriate meta fields"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -952,7 +952,7 @@
       "Step 4: Trigger 404 error and verify same structure",
       "Step 5: Trigger 429 error and verify same structure with retry_after"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
