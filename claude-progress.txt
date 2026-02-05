@@ -3537,3 +3537,47 @@ Created comprehensive unit test suite:
    - 94% achieved through systematic test design
    - Remaining 6% represents truly edge cases
 
+
+# Session 21 (2026-02-05)
+
+## Summary
+Completed Docker container test (#81). Fixed Dockerfile to build successfully and verified container runs with health endpoint responding correctly.
+
+## Completed Tasks
+
+### Test #81: Docker container builds and runs successfully ✅
+Fixed and verified Docker build process:
+
+**Issues Found:**
+1. README.md not copied before package installation (caused build failure)
+2. Editable install (-e) used instead of regular install
+3. Build order inefficient
+
+**Fixes Applied:**
+1. Updated Dockerfile to copy README.md before uv pip install
+2. Changed from `uv pip install --system -e .` to `uv pip install --system .`
+3. Reordered COPY commands: pyproject.toml + README → app/ → install → data/
+
+**Verification Results:**
+```
+✅ docker build -t reportcard-api . → SUCCESS
+✅ docker run -p 8000:8000 reportcard-api → Container started
+✅ curl http://localhost:8000/health → {"status": "ok"}
+```
+
+## Current Status
+- **78 out of 80 tests passing** (97.5% complete)
+- **2 tests remaining:**
+  1. Test #82: Docker-compose starts development environment
+  2. Test #83: Environment variables configure application correctly
+
+## Next Steps
+1. Test #82: Docker-compose - verify docker-compose.yml works correctly
+2. Test #83: Environment variables - test configuration via env vars
+
+## Technical Notes
+- Docker Desktop installed and verified working (version 29.2.0)
+- Docker Compose available (version 5.0.2)
+- Local dev server restarted successfully after Docker testing
+- All previous tests remain passing
+
