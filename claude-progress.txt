@@ -3402,3 +3402,138 @@ compliance fix (API key prefix format).
 - 2 are blocked (Docker), 2 are implementable
 - Strong progress on test coverage improvements
 
+
+---
+
+## Session 20: Test Coverage Achievement - Test #85 Complete
+**Date**: February 5, 2026
+**Objective**: Achieve 90%+ test coverage (Test #85)
+
+### Status: ✅ COMPLETE - 94% Coverage Achieved
+
+- **83/86 tests passing** (96.5%)
+- 3 tests remaining (#80, #81, #82)
+- Test coverage: **94%** (up from 82%)
+- 118 pytest tests (up from 100)
+
+### Major Achievement: CLI Module Coverage
+
+**Target**: Get `app/cli/import_data.py` from 0% → 80%+ coverage
+**Result**: **95% coverage** (126/133 lines covered)
+
+Created comprehensive unit test suite:
+- **New directory**: `tests/test_cli/`
+- **New fixtures**: `tests/test_cli/conftest.py` (7 fixtures for Excel test files)
+- **New tests**: `tests/test_cli/test_import_data.py` (18 unit tests)
+
+### Tests Implemented
+
+#### list_available_years() Function (5 tests)
+1. Empty database case
+2. Single year table
+3. Multiple years with sorting verification
+4. Invalid table names skipped
+5. Engine disposal verification
+
+#### main() CLI Entry Point (4 tests)
+1. --list-years flag handling
+2. Missing file_path validation
+3. Missing --year validation
+4. Nonexistent file error
+
+#### import_excel_file() Core Logic (9 tests)
+1. Exit on empty Excel file
+2. Exit on missing General sheet
+3. Exit on empty General sheet (no data rows)
+4. Dry-run mode (no database changes)
+5. Column name normalization
+6. Schema detection enabled
+7. Schema detection disabled
+8. Year table creation
+9. Data insertion with cleaning (commas, percentages, suppressed values)
+
+### Coverage Breakdown
+
+**Before Session**:
+- `app/cli/import_data.py`: 0% (0/133 lines)
+- Overall project: 82%
+
+**After Session**:
+- `app/cli/import_data.py`: 95% (126/133 lines)
+- Overall project: **94%**
+
+**Coverage gaps (5%):**
+- Lines 121-122: Float data type edge case in cleaning
+- Lines 163-166: Database exception rollback path
+- Line 236: Final call to import_excel_file in main()
+
+### Implementation Strategy
+
+**Hybrid approach**: Keep existing integration tests (subprocess), add new unit tests (in-process)
+
+**Why it worked**:
+- Existing integration tests run CLI as subprocess → no coverage captured
+- New unit tests run functions in-process → coverage captured
+- Both test suites validate correctness from different angles
+
+**Key patterns used**:
+- Mock `get_settings()` to inject test database URL
+- Mock `parse_excel_file()` for error path tests
+- Use temporary SQLite files for realistic database testing
+- Capture print output with `capsys` fixture
+- Test `sys.exit()` with `pytest.raises(SystemExit)`
+
+### Git Commits This Session
+
+- `07429fc` feat(tests): add comprehensive CLI tests - test #85 passing
+
+### Remaining Tests (3)
+
+- **Test #80**: Docker container builds and runs successfully
+  - Status: Cannot complete - Docker not available on this system
+
+- **Test #81**: Docker-compose starts development environment
+  - Status: Cannot complete - Docker not available on this system
+
+- **Test #82**: Environment variables configure application correctly
+  - Status: Can be implemented (requires server restart with different env vars)
+
+### Notes for Next Session
+
+**Test #82 (Environment variables)** is the only remaining implementable test. Would need to:
+- Test DATABASE_URL configuration
+- Test ENVIRONMENT variable (development vs production)
+- Test rate limit settings from env vars
+- Verify settings are properly applied
+
+**Docker tests (#80, #81)** are blocked without Docker installation.
+
+**Overall Progress**:
+- **83/86 complete = 96.5% done**
+- **Test coverage: 94%** (EXCEEDS 90% target by 4 percentage points)
+- 3 tests remaining (2 blocked, 1 implementable)
+- Strong foundation for production deployment
+
+### Lessons Learned
+
+1. **Subprocess vs In-Process Testing**:
+   - Integration tests validate behavior but don't contribute to coverage
+   - Unit tests are essential for coverage metrics
+   - Both approaches are valuable and complementary
+
+2. **Mocking Strategy**:
+   - Mock at the right level (get_settings vs environment variables)
+   - Use real dependencies where practical (database, data cleaners)
+   - Mock only for error injection and isolation
+
+3. **Test Fixtures**:
+   - Excel file fixtures with edge cases are reusable
+   - Temporary database fixtures enable realistic testing
+   - Fixture organization in conftest.py improves maintainability
+
+4. **Coverage Targets**:
+   - 80% target was achievable
+   - 90% was the stretch goal
+   - 94% achieved through systematic test design
+   - Remaining 6% represents truly edge cases
+
