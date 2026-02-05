@@ -977,7 +977,7 @@
       "Step 5: Verify request/response schemas are shown",
       "Step 6: Take screenshot of main documentation page"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -988,7 +988,7 @@
       "Step 3: Verify request body examples provided",
       "Step 4: Verify error response examples included"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1042,7 +1042,7 @@
       "Step 5: Verify error message includes the requested resource ID",
       "Step 6: Take screenshot of error response examples"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1054,7 +1054,7 @@
       "Step 4: Verify API usage examples included",
       "Step 5: Verify deployment instructions present"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -1076,6 +1076,6 @@
       "Step 3: Verify no deprecation warnings",
       "Step 4: Verify no uncaught exceptions in test output"
     ],
-    "passes": false
+    "passes": true
   }
 ]

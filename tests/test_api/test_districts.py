@@ -636,3 +636,151 @@ def test_get_districts_returns_400_for_invalid_year(client):
     # Step 4: Verify error message indicates available years
     assert "message" in error_data
     assert "year" in error_data["message"].lower() or "2030" in error_data["message"]
+
+
+def test_get_districts_returns_400_for_invalid_sort_field(client):
+    """Test invalid sort field error handling."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_invalid_sort_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create table with known columns
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district_name", "data_type": "string"}
+        ]
+        create_year_table(2025, "districts", schema, engine)
+
+    finally:
+        db.close()
+
+    # Try to sort by a non-existent column
+    response = client.get(
+        "/districts/2025?sort=nonexistent_column",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    assert response.status_code == 400
+    error_data = response.json()
+    assert error_data["code"] == "INVALID_PARAMETER"
+    assert "Invalid sort field" in error_data["message"]
+
+
+def test_get_district_by_rcdts_supports_field_selection(client):
+    """Test field selection on single district endpoint."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_district_field_select_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create table and insert test district
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district_name", "data_type": "string"},
+            {"column_name": "city", "data_type": "string"},
+            {"column_name": "county", "data_type": "string"}
+        ]
+        create_year_table(2025, "districts", schema, engine)
+
+        district_data = {
+            "rcdts": "15-016-0000-26",
+            "district_name": "Chicago Public Schools",
+            "city": "Chicago",
+            "county": "Cook"
+        }
+
+        db.execute(text(
+            "INSERT INTO districts_2025 (rcdts, district_name, city, county) VALUES (:rcdts, :district_name, :city, :county)"
+        ), district_data)
+        db.commit()
+
+    finally:
+        db.close()
+
+    # Request only specific fields
+    response = client.get(
+        "/districts/2025/15-016-0000-26?fields=rcdts,district_name",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify only requested fields are present
+    assert "rcdts" in data["data"]
+    assert "district_name" in data["data"]
+    # City and county should not be included
+    assert "city" not in data["data"] or data["data"].get("city") is None
+    assert "county" not in data["data"] or data["data"].get("county") is None
+
+    # Verify meta.fields_returned is present
+    assert "fields_returned" in data["meta"]
+    assert data["meta"]["fields_returned"] == 2
+
+
+def test_get_districts_returns_400_when_no_data_imported(client):
+    """Test error when no district data has been imported at all."""
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        # Create test API key
+        test_key = "rcapi_test_no_districts_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Don't create any district tables
+
+    finally:
+        db.close()
+
+    # Try to access districts when none exist
+    response = client.get(
+        "/districts/2025",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    assert response.status_code == 400
+    error_data = response.json()
+    assert error_data["code"] == "INVALID_PARAMETER"
+    # Should mention that no data has been imported
+    assert "No district data has been imported" in error_data["message"] or "No data available" in error_data["message"]

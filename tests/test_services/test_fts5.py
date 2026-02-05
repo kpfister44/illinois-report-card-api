@@ -4,6 +4,7 @@
 import pytest
 from sqlalchemy import text
 from app.models.database import EntitiesMaster
+from app.services.fts5 import rebuild_fts5_index
 
 
 def test_fts5_index_created_and_synced(db_session):
@@ -104,3 +105,62 @@ def test_fts5_index_created_and_synced(db_session):
     ))
     count = result.scalar()
     assert count == 2, "FTS5 index should now contain 2 entities after deletion"
+
+
+def test_rebuild_fts5_index(db_session):
+    """Test rebuild_fts5_index function clears and rebuilds FTS5 index from entities_master."""
+    from tests.conftest import engine
+
+    # Add some entities to entities_master
+    entities = [
+        EntitiesMaster(
+            rcdts="15-016-0010-22",
+            entity_type="school",
+            name="Lincoln Elementary School",
+            city="Chicago",
+            county="Cook"
+        ),
+        EntitiesMaster(
+            rcdts="15-016-0000-26",
+            entity_type="district",
+            name="Chicago Public Schools",
+            city="Chicago",
+            county="Cook"
+        ),
+        EntitiesMaster(
+            rcdts="46-062-0020-22",
+            entity_type="school",
+            name="Springfield High School",
+            city="Springfield",
+            county="Sangamon"
+        )
+    ]
+
+    for entity in entities:
+        db_session.add(entity)
+    db_session.commit()
+
+    # Verify FTS5 has 3 entities (via triggers)
+    result = db_session.execute(text("SELECT COUNT(*) FROM entities_fts"))
+    assert result.scalar() == 3
+
+    # Manually corrupt FTS5 by deleting an entry
+    db_session.execute(text("DELETE FROM entities_fts WHERE rcdts = '15-016-0010-22'"))
+    db_session.commit()
+
+    # Verify FTS5 is now out of sync (only 2 entries)
+    result = db_session.execute(text("SELECT COUNT(*) FROM entities_fts"))
+    assert result.scalar() == 2
+
+    # Rebuild FTS5 index
+    rebuild_fts5_index(engine)
+
+    # Verify FTS5 is back in sync (all 3 entities restored)
+    result = db_session.execute(text("SELECT COUNT(*) FROM entities_fts"))
+    assert result.scalar() == 3
+
+    # Verify the previously deleted entry is back
+    result = db_session.execute(text(
+        "SELECT COUNT(*) FROM entities_fts WHERE rcdts = '15-016-0010-22'"
+    ))
+    assert result.scalar() == 1

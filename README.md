@@ -197,6 +197,38 @@ ReportCardAPI/
 | standard | 1,000 |
 | premium | 10,000 |
 
+## Deployment
+
+### Railway
+
+1. Install Railway CLI: `npm i -g @railway/cli`
+2. Login: `railway login`
+3. Initialize project: `railway init`
+4. Deploy: `railway up`
+5. Set environment variables in Railway dashboard:
+   - `ENVIRONMENT=production`
+   - `ADMIN_API_KEY=<your-admin-key>`
+
+### Fly.io
+
+1. Install Fly CLI: `curl -L https://fly.io/install.sh | sh`
+2. Login: `fly auth login`
+3. Launch app: `fly launch`
+4. Set secrets:
+   ```bash
+   fly secrets set ENVIRONMENT=production
+   fly secrets set ADMIN_API_KEY=<your-admin-key>
+   ```
+5. Deploy: `fly deploy`
+
+### Docker-Compatible Platforms
+
+The application works on any platform supporting Docker containers:
+- Use the included `Dockerfile` and `docker-compose.yml`
+- Set required environment variables
+- Expose port 8000
+- Mount persistent volume for SQLite database at `/app/data`
+
 ## License
 
 [License TBD]
