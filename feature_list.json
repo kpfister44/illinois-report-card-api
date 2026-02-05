@@ -1001,7 +1001,7 @@
       "Step 5: Send GET /health to localhost:8000",
       "Step 6: Verify healthy response received"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
