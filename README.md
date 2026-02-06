@@ -47,13 +47,34 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### Using Docker
 
+**Development (with live reload):**
 ```bash
-# Start with docker-compose
-docker-compose up
+# Uses docker-compose.yml with volume mounts for code changes
+docker compose up
 
-# Or build and run manually
+# Stop and remove containers
+docker compose down
+```
+
+**Production:**
+```bash
+# Build the image
 docker build -t reportcard-api .
-docker run -p 8000:8000 reportcard-api
+
+# Run with environment variables
+docker run -d \
+  -p 8000:8000 \
+  -e ENVIRONMENT=production \
+  -e DATABASE_URL=sqlite:///./data/reportcard.db \
+  -v $(pwd)/data:/app/data \
+  --name reportcard-api \
+  reportcard-api
+
+# View logs
+docker logs -f reportcard-api
+
+# Stop container
+docker stop reportcard-api && docker rm reportcard-api
 ```
 
 ## API Endpoints
@@ -223,11 +244,17 @@ ReportCardAPI/
 
 ### Docker-Compatible Platforms
 
-The application works on any platform supporting Docker containers:
-- Use the included `Dockerfile` and `docker-compose.yml`
-- Set required environment variables
-- Expose port 8000
-- Mount persistent volume for SQLite database at `/app/data`
+The application works on any platform supporting Docker containers (AWS ECS, Google Cloud Run, Azure Container Instances, etc.):
+
+**Required Configuration:**
+- Container port: `8000`
+- Persistent volume: `/app/data` (for SQLite database)
+- Environment variables:
+  - `ENVIRONMENT=production`
+  - `DATABASE_URL=sqlite:///./data/reportcard.db`
+  - `ADMIN_API_KEY=<your-secure-key>` (optional, for admin endpoints)
+
+**Health Check Endpoint:** `GET /health` (returns `{"status": "ok"}`)
 
 ## License
 
