@@ -105,38 +105,17 @@ ReportCardAPI/
 
 ## Current Status
 
-- **Tests:** 124/124 passing (100%)
+- **Tests:** 125/125 passing (100%)
 - **All API endpoints:** Implemented and tested
-- **Database:** Empty — no real data has been imported yet
+- **Database:** Fully populated — all 15 years (2010–2024) imported
 - **Data files:** `data/report-cards/` contains Excel files for 2010–2024
-- **Import pipeline:** Fixed and ready — entity type splitting and multi-sheet support complete
+- **Import pipeline:** Fully operational — entity type splitting, multi-sheet support, digit-leading column prefix, duplicate column deduplication all in place
 
 ---
 
 ## What's Next
 
-### 1. Data Ingestion (immediate priority — Phase 3 ready to execute)
-
-The import pipeline is fixed and tested. Next step is importing real 2024 data. See the plan file at `~/.claude/plans/fancy-fluttering-shamir.md` for the full step-by-step.
-
-```bash
-# Initialize the database (creates base tables + FTS5)
-.venv/bin/python -c "from app.database import init_db, engine; init_db(engine)"
-
-# Import 2024 (dry run first)
-.venv/bin/python -m app.cli.import_data data/report-cards/24-RC-Pub-Data-Set.xlsx --year 2024 --dry-run
-
-# Full import
-.venv/bin/python -m app.cli.import_data data/report-cards/24-RC-Pub-Data-Set.xlsx --year 2024
-```
-
-**Import pipeline details:**
-- 2010–2017: single General sheet, all schools (no Type column)
-- 2018–2024: multi-sheet, General sheet has Type=School/District/Statewide
-- Tables: `schools_{year}`, `districts_{year}`, `state_{year}` (General sheet), plus `schools_finance_{year}`, `schools_iar_{year}`, etc. for other sheets
-- Constants controlling this: `ENTITY_TYPE_MAP`, `SKIP_SHEETS`, `SHEET_SUFFIX_MAP` in `app/cli/import_data.py`
-
-### 2. New API Features
+### 1. New API Features
 
 Add endpoints or capabilities as needed based on real-world usage. Follow TDD.
 
