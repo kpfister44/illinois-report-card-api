@@ -118,4 +118,8 @@ def normalize_column_name(name):
     # Remove leading/trailing underscores
     name = name.strip('_')
 
+    # Prefix names starting with a digit — invalid SQL identifiers
+    if name and name[0].isdigit():
+        name = 'n' + name
+
     return name

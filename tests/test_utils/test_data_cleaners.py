@@ -81,3 +81,7 @@ def test_normalize_column_name():
 
     # Already lowercase
     assert normalize_column_name("rcdts") == "rcdts"
+
+    # Column names starting with a digit must be prefixed (invalid SQL identifiers otherwise)
+    assert normalize_column_name("4 Year Graduation Rate") == "n4_year_graduation_rate"
+    assert normalize_column_name("6_year_grad_rate") == "n6_year_grad_rate"
