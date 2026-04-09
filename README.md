@@ -9,7 +9,7 @@ A comprehensive REST API for accessing Illinois public school data from the Illi
 - `GET /health` — public health check (no auth required)
 - All other endpoints require `Authorization: Bearer <api_key>`
 
-To request an API key, contact the project owner.
+**To request an API key**, email [kpfister44@gmail.com](mailto:kpfister44@gmail.com) with a brief description of your intended use.
 
 ## Features
 
@@ -41,8 +41,8 @@ To request an API key, contact the project owner.
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd ReportCardAPI
+git clone https://github.com/kpfister44/illinois-report-card-api.git
+cd illinois-report-card-api
 
 # Run the setup script
 ./init.sh
@@ -126,24 +126,33 @@ Require admin API key.
 
 ## Usage Examples
 
+Replace `rc_live_xxxxx` with your API key. Examples use the live API — swap the base URL for `http://localhost:8000` when running locally.
+
 ### Search for schools
 
 ```bash
 curl -H "Authorization: Bearer rc_live_xxxxx" \
-  "http://localhost:8000/search?q=Lincoln&type=school&limit=10"
+  "https://reportcard-api-production.up.railway.app/search?q=Lincoln&type=school&limit=10"
 ```
 
 ### Get schools with filtering
 
 ```bash
 curl -H "Authorization: Bearer rc_live_xxxxx" \
-  "http://localhost:8000/schools/2024?city=Chicago&type=high&limit=20"
+  "https://reportcard-api-production.up.railway.app/schools/2024?city=Chicago&limit=20"
+```
+
+### Get districts for a year
+
+```bash
+curl -H "Authorization: Bearer rc_live_xxxxx" \
+  "https://reportcard-api-production.up.railway.app/districts/2023"
 ```
 
 ### Flexible query
 
 ```bash
-curl -X POST "http://localhost:8000/query" \
+curl -X POST "https://reportcard-api-production.up.railway.app/query" \
   -H "Authorization: Bearer rc_live_xxxxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -257,41 +266,29 @@ ReportCardAPI/
 
 ## Deployment
 
-### Railway
+The app is deployed on Railway using a Docker image hosted on Docker Hub (`kpfister44/reportcard-api:latest`). The database is baked into the image — no persistent volume required.
 
-1. Install Railway CLI: `npm i -g @railway/cli`
-2. Login: `railway login`
-3. Initialize project: `railway init`
-4. Deploy: `railway up`
-5. Set environment variables in Railway dashboard:
-   - `ENVIRONMENT=production`
-   - `ADMIN_API_KEY=<your-admin-key>`
+### Redeploying after code changes
 
-### Fly.io
+```bash
+# 1. Rebuild for linux/amd64 and push to Docker Hub
+docker buildx build --platform linux/amd64 -t kpfister44/reportcard-api:latest --push .
 
-1. Install Fly CLI: `curl -L https://fly.io/install.sh | sh`
-2. Login: `fly auth login`
-3. Launch app: `fly launch`
-4. Set secrets:
-   ```bash
-   fly secrets set ENVIRONMENT=production
-   fly secrets set ADMIN_API_KEY=<your-admin-key>
-   ```
-5. Deploy: `fly deploy`
+# 2. Trigger Railway redeploy
+railway redeploy --service reportcard-api --yes
+```
 
-### Docker-Compatible Platforms
+### Required environment variables (set in Railway dashboard)
 
-The application works on any platform supporting Docker containers (AWS ECS, Google Cloud Run, Azure Container Instances, etc.):
+| Variable | Value |
+|----------|-------|
+| `ENVIRONMENT` | `production` |
+| `DATABASE_URL` | `sqlite:///./data/reportcard.db` |
+| `ADMIN_API_KEY` | Bootstrap admin key — set once, creates the first admin key on startup |
 
-**Required Configuration:**
-- Container port: `8000`
-- Persistent volume: `/app/data` (for SQLite database)
-- Environment variables:
-  - `ENVIRONMENT=production`
-  - `DATABASE_URL=sqlite:///./data/reportcard.db`
-  - `ADMIN_API_KEY=<your-secure-key>` (optional, for admin endpoints)
+### Self-hosting
 
-**Health Check Endpoint:** `GET /health` (returns `{"status": "ok"}`)
+The app runs on any platform that supports Docker. Set the environment variables above, expose port `8000`, and use `GET /health` as your health check endpoint.
 
 ## License
 
