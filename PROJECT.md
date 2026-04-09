@@ -6,7 +6,7 @@ This document is the primary orientation for any new Claude Code session. Read i
 
 ## What This Is
 
-A REST API that provides programmatic access to Illinois public school data from the Illinois State Board of Education (ISBE) Illinois Report Card. It handles 20 years of historical data (2010–2024), each year stored in its own table to accommodate schema changes across years. All endpoints are implemented, all 118 tests pass, and real Excel data is on disk waiting to be imported.
+A REST API that provides programmatic access to Illinois public school data from the Illinois State Board of Education (ISBE) Illinois Report Card. It handles 15 years of historical data (2010–2024), each year stored in its own table to accommodate schema changes across years. All endpoints are implemented, all tests pass, and the database is fully populated with real data.
 
 ---
 
@@ -95,7 +95,7 @@ ReportCardAPI/
 │   └── test_database.py     # DB init, session management
 ├── data/
 │   ├── report-cards/        # Real Excel files: 2010–2024 from ISBE
-│   └── reportcard.db        # SQLite database (empty until import runs)
+│   └── reportcard.db        # SQLite database (fully populated)
 ├── Dockerfile               # Production image (python:3.12-slim)
 ├── docker-compose.yml       # Dev setup with live reload
 └── pyproject.toml           # Dependencies + dev dependencies
@@ -113,13 +113,30 @@ ReportCardAPI/
 
 ---
 
+## Data Coverage
+
+| Years | Format | Tables created |
+|-------|--------|----------------|
+| 2010–2017 | Single General sheet, all rows are schools | `schools_{year}` only |
+| 2018–2024 | Multi-sheet, Type column splits rows | `schools_{year}`, `districts_{year}`, `state_{year}` + supplementary sheets (finance, IAR, SAT, etc.) |
+
+### Supplementary files not imported
+
+The `data/report-cards/` directory contains several files that are **not** imported into the database:
+
+- **`school_11.xlsx` – `school_14.xlsx`** — Grade-level ISAT/PSAE/ACT proficiency data for 2011–2014. These use a non-standard multi-row header format incompatible with the current import pipeline. The main `schools_{year}` tables for those years already include ACT composite and subject scores from the main Report Card files, which covers most use cases. If grade-level ISAT/PSAE breakdowns are needed in the future, a custom parser would be required.
+- **`2018-PARCC-SAT-Proficient.xlsx`** — Supplementary PARCC/SAT proficiency file for 2018. The main `schools_2018` table already contains PARCC and SAT data from the primary import.
+- **`RC13_layout.xlsx` – `RC17_layout.xlsx`** — Schema layout/documentation files, not data.
+
+---
+
 ## What's Next
 
 ### 1. New API Features
 
 Add endpoints or capabilities as needed based on real-world usage. Follow TDD.
 
-### 3. Deployment
+### 2. Deployment
 
 The app is Docker-ready. Deployment targets: Railway or Fly.io (both have docs in README.md). A persistent volume at `/app/data` is required for the SQLite database.
 

@@ -4,8 +4,8 @@ A comprehensive REST API for accessing Illinois public school data from the Illi
 
 ## Features
 
-- **Full Data Access**: All 681+ columns from Illinois Report Card Excel files
-- **Year-Partitioned Architecture**: Handles format changes across 20 years of historical data
+- **15 Years of Data**: 2010–2024 Illinois Report Card data fully imported and queryable
+- **Year-Partitioned Architecture**: Handles format changes across years — each year has its own table
 - **Full-Text Search**: FTS5-powered search across schools, districts, and state entities
 - **Flexible Query API**: Advanced filtering, sorting, and field selection via POST /query
 - **API Key Authentication**: Secure access with tiered rate limiting
@@ -128,7 +128,7 @@ curl -H "Authorization: Bearer rc_live_xxxxx" \
 
 ```bash
 curl -H "Authorization: Bearer rc_live_xxxxx" \
-  "http://localhost:8000/schools/2025?city=Chicago&type=high&limit=20"
+  "http://localhost:8000/schools/2024?city=Chicago&type=high&limit=20"
 ```
 
 ### Flexible query
@@ -138,7 +138,7 @@ curl -X POST "http://localhost:8000/query" \
   -H "Authorization: Bearer rc_live_xxxxx" \
   -H "Content-Type: application/json" \
   -d '{
-    "year": 2025,
+    "year": 2024,
     "entity_type": "school",
     "fields": ["rcdts", "name", "enrollment", "act_composite"],
     "filters": {
@@ -150,19 +150,34 @@ curl -X POST "http://localhost:8000/query" \
   }'
 ```
 
+## Data Coverage
+
+All 15 years (2010–2024) are imported. The schema varies by era:
+
+| Years | Tables per year |
+|-------|----------------|
+| 2010–2017 | `schools_{year}` — demographics + ACT scores |
+| 2018–2024 | `schools_{year}`, `districts_{year}`, `state_{year}` + supplementary tables (finance, IAR, SAT, CTE, etc.) |
+
+### Supplementary files not imported
+
+The following files in `data/report-cards/` are intentionally excluded:
+
+- **`school_11.xlsx` – `school_14.xlsx`** — Grade-level ISAT/PSAE/ACT proficiency for 2011–2014. These use a non-standard multi-row header format that requires a custom parser. The main `schools_{year}` tables for those years already include ACT composite and subject scores. Grade-level breakdowns could be added in the future if needed.
+- **`2018-PARCC-SAT-Proficient.xlsx`** — Supplementary PARCC/SAT proficiency for 2018. PARCC and SAT data is already present in the main `schools_2018` table.
+- **`RC13_layout.xlsx` – `RC17_layout.xlsx`** — Schema layout documentation files, not data.
+
 ## Data Import
 
 ### CLI Import
 
 ```bash
-# Import a single year
-python -m app.cli.import_data data/2025-Report-Card.xlsx --year 2025
+# Import a single year (always dry-run first)
+.venv/bin/python -m app.cli.import_data data/report-cards/24-RC-Pub-Data-Set.xlsx --year 2024 --dry-run
+.venv/bin/python -m app.cli.import_data data/report-cards/24-RC-Pub-Data-Set.xlsx --year 2024
 
-# Dry run to preview
-python -m app.cli.import_data data/2025-Report-Card.xlsx --year 2025 --dry-run
-
-# List available years
-python -m app.cli.import_data --list-years
+# List imported years
+.venv/bin/python -m app.cli.import_data --list-years
 ```
 
 ## Development
@@ -171,13 +186,13 @@ python -m app.cli.import_data --list-years
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
 # Run with coverage
-pytest --cov=app --cov-report=term-missing
+uv run pytest --cov=app --cov-report=term-missing
 
 # Run specific test file
-pytest tests/test_api/test_schools.py
+uv run pytest tests/test_api/test_schools.py
 ```
 
 ### Project Structure
