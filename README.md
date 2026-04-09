@@ -185,15 +185,28 @@ The following files in `data/report-cards/` are intentionally excluded:
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (unit + integration + real-data)
 uv run pytest
 
 # Run with coverage
 uv run pytest --cov=app --cov-report=term-missing
 
-# Run specific test file
+# Run only the real-data sanity tests (requires populated reportcard.db)
+uv run pytest tests/test_real_data/ -v
+
+# Run a specific test file
 uv run pytest tests/test_api/test_schools.py
 ```
+
+### Test Strategy
+
+| Suite | DB | What it tests |
+|-------|----|---------------|
+| `tests/test_api/`, `tests/test_services/`, `tests/test_utils/` | In-memory SQLite | API logic, endpoint behaviour, utility functions |
+| `tests/test_integration/` | Temp file-based SQLite | Full import pipeline end-to-end |
+| `tests/test_real_data/` | Real `data/reportcard.db` | Row counts, data shape, year boundary conditions across all 15 years |
+
+The real-data tests skip automatically if `data/reportcard.db` is absent or empty, so CI without the database still passes cleanly.
 
 ### Project Structure
 

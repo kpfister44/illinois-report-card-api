@@ -86,10 +86,11 @@ ReportCardAPI/
 │   └── middleware/
 │       └── logging.py       # UsageLoggingMiddleware: logs status code + response time
 ├── tests/
-│   ├── conftest.py          # Fixtures: test DB, test client, sample API keys
-│   ├── test_api/            # 9 files covering all endpoints
+│   ├── conftest.py          # Fixtures: in-memory test DB, test client, API keys
+│   ├── test_api/            # 9 files covering all endpoints (in-memory DB)
 │   ├── test_cli/            # CLI import tests
 │   ├── test_integration/    # End-to-end import + schema detection tests
+│   ├── test_real_data/      # 12 sanity tests against real reportcard.db (skipped if DB absent)
 │   ├── test_services/       # table_manager, FTS5
 │   ├── test_utils/          # data_cleaners, excel_parser, schema_detector
 │   └── test_database.py     # DB init, session management
@@ -105,7 +106,7 @@ ReportCardAPI/
 
 ## Current Status
 
-- **Tests:** 125/125 passing (100%)
+- **Tests:** 137/137 passing (100%) — 125 unit/integration + 12 real-data tests
 - **All API endpoints:** Implemented and tested
 - **Database:** Fully populated — all 15 years (2010–2024) imported
 - **Data files:** `data/report-cards/` contains Excel files for 2010–2024
