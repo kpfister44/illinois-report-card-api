@@ -188,6 +188,32 @@ def test_excel_file(tmp_path):
 
 
 @pytest.fixture
+def excel_with_mixed_entity_types(tmp_path):
+    """Create an Excel file with School, District, and Statewide rows."""
+    file_path = tmp_path / "mixed_types.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "General"
+
+    headers = ["RCDTS", "School Name", "District", "City", "County", "Type", "Enrollment"]
+    ws.append(headers)
+
+    # School rows
+    ws.append(["0100010010260001", "Test Elementary School", "Test District 1", "Springfield", "Sangamon", "School", "425"])
+    ws.append(["0100010010260002", "Test High School", "Test District 1", "Springfield", "Sangamon", "School", "1250"])
+
+    # District rows
+    ws.append(["0100010010260000", None, "Test District 1", "Springfield", "Sangamon", "District", "1675"])
+    ws.append(["0100020020260000", None, "Test District 2", "Chicago", "Cook", "District", "850"])
+
+    # Statewide row
+    ws.append(["9999999999999999", None, "State of Illinois", "Springfield", None, "Statewide", "2000000"])
+
+    wb.save(file_path)
+    return str(file_path)
+
+
+@pytest.fixture
 def temp_database(tmp_path):
     """
     Create a temporary SQLite database file for testing.

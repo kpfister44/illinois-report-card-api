@@ -221,6 +221,75 @@ def test_import_excel_file_inserts_data_with_cleaning(excel_with_edge_cases, tem
 
 
 # =============================================================================
+# Entity Type Splitting
+# =============================================================================
+
+def test_import_splits_schools_and_districts_into_separate_tables(excel_with_mixed_entity_types, temp_database):
+    """Test import creates separate tables for schools, districts, and state based on Type column."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_mixed_entity_types, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+
+    assert 'schools_2024' in table_names
+    assert 'districts_2024' in table_names
+
+    conn = engine.connect()
+    school_count = conn.execute(text("SELECT COUNT(*) FROM schools_2024")).scalar()
+    district_count = conn.execute(text("SELECT COUNT(*) FROM districts_2024")).scalar()
+    conn.close()
+    engine.dispose()
+
+    assert school_count == 2
+    assert district_count == 2
+
+
+def test_import_marks_entities_master_with_correct_type(excel_with_mixed_entity_types, temp_database):
+    """Test entities_master gets correct entity_type for each row (school/district/state)."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_mixed_entity_types, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    school = session.query(EntitiesMaster).filter_by(rcdts="0100010010260001").first()
+    district = session.query(EntitiesMaster).filter_by(rcdts="0100010010260000").first()
+    state = session.query(EntitiesMaster).filter_by(rcdts="9999999999999999").first()
+
+    assert school is not None and school.entity_type == "school"
+    assert district is not None and district.entity_type == "district"
+    assert state is not None and state.entity_type == "state"
+
+    session.close()
+    engine.dispose()
+
+
+def test_import_creates_state_table_for_statewide_row(excel_with_mixed_entity_types, temp_database):
+    """Test that Statewide rows are imported into a state_{year} table."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_mixed_entity_types, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+
+    assert 'state_2024' in table_names
+
+    conn = engine.connect()
+    state_count = conn.execute(text("SELECT COUNT(*) FROM state_2024")).scalar()
+    conn.close()
+    engine.dispose()
+
+    assert state_count == 1
+
+
+# =============================================================================
 # Phase 4: import_excel_file() Exception Handling (Lines 163-169)
 # =============================================================================
 

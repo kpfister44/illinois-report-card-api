@@ -24,6 +24,10 @@ def detect_column_type(column_name: str, values: list) -> str:
     if not non_null_values:
         return "string"  # Default for empty columns
 
+    # Strings with leading zeros are identifiers (e.g. RCDTS codes), not numbers
+    if any(isinstance(v, str) and len(v) > 1 and v.startswith("0") for v in non_null_values):
+        return "string"
+
     # Check if all non-null values are integers (or strings that represent integers)
     all_integers = True
     all_floats = True

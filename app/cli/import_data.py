@@ -6,6 +6,13 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Any
 
+# Maps the "Type" column value to (table_prefix, entities_master entity_type)
+ENTITY_TYPE_MAP = {
+    "School": ("schools", "school"),
+    "District": ("districts", "district"),
+    "Statewide": ("state", "state"),
+}
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
@@ -59,106 +66,111 @@ def import_excel_file(file_path: str, year: int, dry_run: bool = False, detect_s
 
     print(f"Found {len(rows)} rows with {len(headers)} columns")
 
+    # Determine entity grouping based on presence of "Type" column
+    if "Type" in headers:
+        # 2018+ format: split rows by entity type
+        entity_groups: Dict[str, List[Dict]] = {}
+        for row_dict in rows:
+            type_val = row_dict.get("Type", "School")
+            if type_val in ENTITY_TYPE_MAP:
+                entity_groups.setdefault(type_val, []).append(row_dict)
+    else:
+        # 2010-2017 format: all rows are schools
+        entity_groups = {"School": rows}
+
     if dry_run:
+        tables = [f"{ENTITY_TYPE_MAP[t][0]}_{year}" for t in entity_groups]
         print("\nDry run - no database changes will be made")
-        print(f"Would create table: schools_{year}")
+        print(f"Would create table: {', '.join(tables)}")
         print(f"Would import {len(rows)} rows")
         print(f"Columns: {', '.join(headers[:10])}...")
         return
 
-    # Normalize column names
+    # Normalize column names and detect schema (shared across all entity types)
     normalized_headers = [normalize_column_name(h) for h in headers]
 
-    # Detect schema if requested
-    schema_metadata = {}
+    col_schema: Dict[str, Dict] = {}
     schema_list = []
     for i, header in enumerate(headers):
         normalized_header = normalized_headers[i]
-
-        # Get sample values for type detection from row dicts
         sample_values = [row.get(header) for row in rows if row.get(header) is not None]
         data_type = detect_column_type(header, sample_values) if detect_schema else "string"
         category = detect_column_category(normalized_header) if detect_schema else "other"
 
-        # Store metadata for later use
-        schema_metadata[normalized_header] = {
+        col_schema[normalized_header] = {
             "data_type": data_type,
             "category": category,
-            "source_column_name": header
+            "source_column_name": header,
         }
+        schema_list.append({"column_name": normalized_header, "data_type": data_type})
 
-        # Create list format for table_manager
-        schema_list.append({
-            "column_name": normalized_header,
-            "data_type": data_type
-        })
+    # Create all tables before opening a session (avoids SQLite lock contention)
+    for type_val in entity_groups:
+        table_prefix, _ = ENTITY_TYPE_MAP[type_val]
+        table_name = f"{table_prefix}_{year}"
+        print(f"Creating table: {table_name}")
+        create_year_table(year, table_prefix, schema_list, engine)
 
-    # Create year-partitioned table
-    table_name = f"schools_{year}"
-    print(f"Creating table: {table_name}")
-    create_year_table(year, "schools", schema_list, engine)
-
-    # Insert data
-    print(f"Inserting {len(rows)} rows...")
     session = Session()
-
     try:
-        for row_dict in rows:
-            # Build row data dict with cleaning
-            row_data = {}
-            for i, original_header in enumerate(headers):
-                normalized_header = normalized_headers[i]
-                value = row_dict.get(original_header)
-                data_type = schema_metadata[normalized_header]["data_type"]
+        for type_val, group_rows in entity_groups.items():
+            table_prefix, master_entity_type = ENTITY_TYPE_MAP[type_val]
+            table_name = f"{table_prefix}_{year}"
 
-                # Apply data cleaning based on type
-                if data_type == "percentage":
-                    row_data[normalized_header] = clean_percentage(value)
-                elif data_type == "integer":
-                    cleaned = clean_enrollment(value)
-                    row_data[normalized_header] = cleaned if cleaned is not None else handle_suppressed(value)
-                elif data_type == "float":
-                    cleaned = clean_percentage(value) if isinstance(value, str) and "%" in value else value
-                    row_data[normalized_header] = cleaned if cleaned is not None else handle_suppressed(value)
-                else:
-                    row_data[normalized_header] = handle_suppressed(value)
 
-            # Insert row using raw SQL (since table is dynamic)
-            columns = ", ".join(row_data.keys())
-            placeholders = ", ".join([f":{k}" for k in row_data.keys()])
-            sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            print(f"Inserting {len(group_rows)} rows into {table_name}...")
+            for row_dict in group_rows:
+                row_data = {}
+                for i, original_header in enumerate(headers):
+                    normalized_header = normalized_headers[i]
+                    value = row_dict.get(original_header)
+                    data_type = col_schema[normalized_header]["data_type"]
 
-            session.execute(text(sql), row_data)
+                    if data_type == "percentage":
+                        row_data[normalized_header] = clean_percentage(value)
+                    elif data_type == "integer":
+                        cleaned = clean_enrollment(value)
+                        row_data[normalized_header] = cleaned if cleaned is not None else handle_suppressed(value)
+                    elif data_type == "float":
+                        cleaned = clean_percentage(value) if isinstance(value, str) and "%" in value else value
+                        row_data[normalized_header] = cleaned if cleaned is not None else handle_suppressed(value)
+                    else:
+                        row_data[normalized_header] = handle_suppressed(value)
 
-            # Update entities_master if RCDTS exists
-            if "rcdts" in row_data and row_data["rcdts"]:
-                entity = session.query(EntitiesMaster).filter_by(rcdts=row_data["rcdts"]).first()
-                if not entity:
-                    entity = EntitiesMaster(
-                        rcdts=row_data["rcdts"],
-                        name=row_data.get("school_name", ""),
-                        city=row_data.get("city", ""),
-                        county=row_data.get("county", ""),
-                        entity_type="school"
+                columns = ", ".join(row_data.keys())
+                placeholders = ", ".join([f":{k}" for k in row_data.keys()])
+                sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+                session.execute(text(sql), row_data)
+
+                if "rcdts" in row_data and row_data["rcdts"]:
+                    entity = session.query(EntitiesMaster).filter_by(rcdts=row_data["rcdts"]).first()
+                    if not entity:
+                        name = row_data.get("school_name") or row_data.get("district", "")
+                        entity = EntitiesMaster(
+                            rcdts=row_data["rcdts"],
+                            entity_type=master_entity_type,
+                            name=name,
+                            city=row_data.get("city", ""),
+                            county=row_data.get("county", ""),
+                        )
+                        session.add(entity)
+
+            if detect_schema:
+                print("Populating schema metadata...")
+                for column_name, column_info in col_schema.items():
+                    metadata_entry = SchemaMetadata(
+                        year=year,
+                        table_name=table_name,
+                        column_name=column_name,
+                        data_type=column_info["data_type"],
+                        category=column_info["category"],
+                        source_column_name=column_info["source_column_name"],
                     )
-                    session.add(entity)
-
-        # Populate schema_metadata
-        if detect_schema:
-            print("Populating schema metadata...")
-            for column_name, column_info in schema_metadata.items():
-                metadata_entry = SchemaMetadata(
-                    year=year,
-                    table_name=table_name,
-                    column_name=column_name,
-                    data_type=column_info["data_type"],
-                    category=column_info["category"],
-                    source_column_name=column_info["source_column_name"]
-                )
-                session.add(metadata_entry)
+                    session.add(metadata_entry)
 
         session.commit()
-        print(f"Import completed successfully! Imported {len(rows)} rows into {table_name}")
+        total = sum(len(g) for g in entity_groups.values())
+        print(f"Import completed successfully! Imported {total} rows")
 
     except Exception as e:
         session.rollback()
