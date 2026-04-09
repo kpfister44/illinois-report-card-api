@@ -1,13 +1,23 @@
 # ABOUTME: FastAPI application entry point
 # ABOUTME: Configures app, registers routers, and sets up middleware
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.api import health, years, schema, schools, districts, state, search, admin, query
+from app.database import init_db
 from app.middleware.logging import UsageLoggingMiddleware
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Illinois Report Card API",
     description="REST API for accessing Illinois public school data",
     version="0.1.0",

@@ -73,6 +73,17 @@ def test_get_db_yields_session():
     # but the generator cleanup should have run
 
 
+def test_app_startup_calls_init_db():
+    """App lifespan calls init_db() on startup."""
+    from unittest.mock import patch, MagicMock
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    with patch("app.main.init_db") as mock_init_db:
+        with TestClient(app):
+            mock_init_db.assert_called_once()
+
+
 class TestAdminKeyBootstrap:
     """Tests for ADMIN_API_KEY bootstrap behavior in init_db()."""
 
