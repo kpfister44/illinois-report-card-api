@@ -1,0 +1,25 @@
+# Python virtual environment — has symlinks that resolve outside project directory
+.venv/
+
+# Excel source files — data is baked in via reportcard.db
+data/report-cards/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Testing
+tests/
+htmlcov/
+.coverage
+
+# Git
+.git/
+
+# Local config
+.env
+*.env

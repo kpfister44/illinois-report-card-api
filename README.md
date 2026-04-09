@@ -2,6 +2,15 @@
 
 A comprehensive REST API for accessing Illinois public school data from the Illinois Report Card. Provides programmatic access to school, district, and state-level education data including enrollment, demographics, assessment scores, and more.
 
+## Live API
+
+**Base URL:** `https://reportcard-api-production.up.railway.app`
+
+- `GET /health` — public health check (no auth required)
+- All other endpoints require `Authorization: Bearer <api_key>`
+
+To request an API key, contact the project owner.
+
 ## Features
 
 - **15 Years of Data**: 2010–2024 Illinois Report Card data fully imported and queryable

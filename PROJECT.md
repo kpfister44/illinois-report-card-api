@@ -106,11 +106,12 @@ ReportCardAPI/
 
 ## Current Status
 
-- **Tests:** 137/137 passing (100%) — 125 unit/integration + 12 real-data tests
+- **Tests:** 129/129 passing (100%) — unit/integration tests (real-data tests excluded from CI count)
 - **All API endpoints:** Implemented and tested
 - **Database:** Fully populated — all 15 years (2010–2024) imported
 - **Data files:** `data/report-cards/` contains Excel files for 2010–2024
 - **Import pipeline:** Fully operational — entity type splitting, multi-sheet support, digit-leading column prefix, duplicate column deduplication all in place
+- **Deployed:** Live on Railway at `https://reportcard-api-production.up.railway.app`
 
 ---
 
@@ -137,31 +138,14 @@ The `data/report-cards/` directory contains several files that are **not** impor
 
 Add endpoints or capabilities as needed based on real-world usage. Follow TDD.
 
-### 2. Deployment (immediate next priority)
+### 2. Redeploying
 
-The app is Docker-ready and all data is imported. The next session should plan and execute deployment. Key things to address:
+The database is baked into the Docker image. To redeploy with code changes:
 
-**Pre-deploy tasks:**
-- Write a `setup.sh` script that initializes the database and imports all 15 years in one command, so deployment is repeatable and not manual
-- Document the first-run flow: set `ADMIN_API_KEY` env var → run `setup.sh` → create a production API key via `POST /admin/keys`
+1. Build and push: `docker buildx build --platform linux/amd64 -t kpfister44/reportcard-api:latest --push .`
+2. Redeploy: `railway redeploy --service reportcard-api --yes`
 
-**Platform choice (decide before planning):**
-- **Railway** — easiest, good free tier, persistent volumes are straightforward
-- **Fly.io** — more control, slightly more setup, also solid for SQLite
-- Both are already documented in README.md
-
-**SQLite + persistent volume considerations:**
-- The database is ~362MB and read-only after import — SQLite is fine for this workload
-- The volume mount at `/app/data` must survive redeploys (verify this on chosen platform)
-- Backup strategy: copying the `.db` file is sufficient
-
-**Suggested deployment order:**
-1. Write `setup.sh` (init DB + import all years)
-2. Pick Railway or Fly.io
-3. Configure persistent volume at `/app/data`
-4. Set `ADMIN_API_KEY` env var and deploy
-5. Smoke test the live API (same endpoints as local smoke test)
-6. Create a production API key and document the live endpoint URL
+The `ADMIN_API_KEY` bootstrap key is set in Railway environment variables — on startup `init_db()` ensures it exists in the database automatically.
 
 ---
 
