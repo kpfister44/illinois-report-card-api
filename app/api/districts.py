@@ -45,8 +45,8 @@ async def get_districts(
             message = f"No data available for year {year}. No district data has been imported yet."
 
         raise HTTPException(
-            status_code=400,
-            detail={"code": "INVALID_PARAMETER", "message": message}
+            status_code=404,
+            detail={"code": "NOT_FOUND", "message": message}
         )
 
     # Validate sort field if provided
@@ -146,8 +146,8 @@ async def get_district_by_rcdts(
             message = f"No data available for year {year}. No district data has been imported yet."
 
         raise HTTPException(
-            status_code=400,
-            detail={"code": "INVALID_PARAMETER", "message": message}
+            status_code=404,
+            detail={"code": "NOT_FOUND", "message": message}
         )
 
     # Parse fields parameter

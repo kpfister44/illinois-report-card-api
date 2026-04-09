@@ -145,8 +145,8 @@ def test_get_state_supports_field_selection(client):
     assert len(state.keys()) == 2
 
 
-def test_get_state_returns_400_for_invalid_year(client):
-    """Test #45: GET /state/{year} returns 400 for invalid year."""
+def test_get_state_returns_404_for_missing_year(client):
+    """Test #45: GET /state/{year} returns 404 when no data exists for that year."""
     from tests.conftest import TestingSessionLocal, engine
 
     db = TestingSessionLocal()
@@ -175,14 +175,14 @@ def test_get_state_returns_400_for_invalid_year(client):
         headers={"Authorization": f"Bearer {test_key}"}
     )
 
-    # Step 2: Verify response status code is 400
-    assert response.status_code == 400
+    # Step 2: Verify response status code is 404
+    assert response.status_code == 404
 
-    # Step 3: Verify error response has code INVALID_PARAMETER
+    # Step 3: Verify error response has code NOT_FOUND
     data = response.json()
     assert "code" in data
-    assert data["code"] == "INVALID_PARAMETER"
+    assert data["code"] == "NOT_FOUND"
 
-    # Step 4: Verify error message indicates available years
+    # Step 4: Verify error message references the year
     assert "message" in data
     assert "2030" in data["message"]

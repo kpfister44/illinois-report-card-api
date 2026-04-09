@@ -142,9 +142,9 @@ def test_api_error_responses_follow_consistent_format(client):
             assert "code" in resp_data, f"Error should have 'code': {resp_data}"
             assert "message" in resp_data, f"Error should have 'message': {resp_data}"
 
-    # Step 1: Trigger 400 error - request invalid year
+    # Step 1: Trigger 404 error - request year with no data
     response = client.get("/schools/9999", headers=auth_header)
-    assert response.status_code == 400, f"Expected 400, got {response.status_code}: {response.text}"
+    assert response.status_code == 404, f"Expected 404, got {response.status_code}: {response.text}"
     assert_error_format(response.json())
 
     # Step 2: Trigger 401 error and verify same structure

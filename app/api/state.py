@@ -39,8 +39,8 @@ async def get_state(
             message = f"No data available for year {year}. No state data has been imported yet."
 
         raise HTTPException(
-            status_code=400,
-            detail={"code": "INVALID_PARAMETER", "message": message}
+            status_code=404,
+            detail={"code": "NOT_FOUND", "message": message}
         )
 
     # Parse fields parameter

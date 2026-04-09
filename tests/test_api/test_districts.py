@@ -588,8 +588,8 @@ def test_get_district_by_rcdts_returns_404_for_nonexistent_district(client):
     assert "nonexistent-id" in data["message"]
 
 
-def test_get_districts_returns_400_for_invalid_year(client):
-    """Test #41 (feature_list.json): GET /districts/{year} returns 400 for invalid year."""
+def test_get_districts_returns_404_for_missing_year(client):
+    """Test #41: GET /districts/{year} returns 404 when no data exists for that year."""
     from tests.conftest import TestingSessionLocal, engine
 
     db = TestingSessionLocal()
@@ -625,15 +625,15 @@ def test_get_districts_returns_400_for_invalid_year(client):
         headers={"Authorization": f"Bearer {test_key}"}
     )
 
-    # Step 2: Verify response status code is 400
-    assert response.status_code == 400
+    # Step 2: Verify response status code is 404
+    assert response.status_code == 404
 
-    # Step 3: Verify error response has code INVALID_PARAMETER
+    # Step 3: Verify error response has code NOT_FOUND
     error_data = response.json()
     assert "code" in error_data
-    assert error_data["code"] == "INVALID_PARAMETER"
+    assert error_data["code"] == "NOT_FOUND"
 
-    # Step 4: Verify error message indicates available years
+    # Step 4: Verify error message references the year
     assert "message" in error_data
     assert "year" in error_data["message"].lower() or "2030" in error_data["message"]
 
@@ -747,7 +747,7 @@ def test_get_district_by_rcdts_supports_field_selection(client):
     assert data["meta"]["fields_returned"] == 2
 
 
-def test_get_districts_returns_400_when_no_data_imported(client):
+def test_get_districts_returns_404_when_no_data_imported(client):
     """Test error when no district data has been imported at all."""
     from tests.conftest import TestingSessionLocal
 
@@ -779,8 +779,7 @@ def test_get_districts_returns_400_when_no_data_imported(client):
         headers={"Authorization": f"Bearer {test_key}"}
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 404
     error_data = response.json()
-    assert error_data["code"] == "INVALID_PARAMETER"
-    # Should mention that no data has been imported
-    assert "No district data has been imported" in error_data["message"] or "No data available" in error_data["message"]
+    assert error_data["code"] == "NOT_FOUND"
+    assert "No data available" in error_data["message"] or "No district data" in error_data["message"]
