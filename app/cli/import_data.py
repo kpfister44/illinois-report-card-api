@@ -146,7 +146,19 @@ def import_excel_file(file_path: str, year: int, dry_run: bool = False, detect_s
         else:
             entity_groups = {"School": rows}
 
-        normalized_headers = [normalize_column_name(h) for h in headers]
+        # Build deduplicated normalized headers: if two columns normalize to the
+        # same name, the second gets a _2 suffix, third a _3 suffix, etc.
+        seen_names: Dict[str, int] = {}
+        normalized_headers = []
+        for h in headers:
+            norm = normalize_column_name(h)
+            if norm in seen_names:
+                seen_names[norm] += 1
+                norm = f"{norm}_{seen_names[norm]}"
+            else:
+                seen_names[norm] = 1
+            normalized_headers.append(norm)
+
         col_schema: Dict[str, Dict] = {}
         schema_list = []
         for i, header in enumerate(headers):

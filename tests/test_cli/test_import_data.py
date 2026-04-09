@@ -562,3 +562,39 @@ def test_main_exits_on_nonexistent_file(capsys):
         # Verify error message was printed
         captured = capsys.readouterr()
         assert "File not found" in captured.out
+
+
+# =============================================================================
+# Duplicate Column Handling
+# =============================================================================
+
+def test_import_deduplicates_columns_with_same_normalized_name(test_excel_file, temp_database):
+    """Two Excel columns normalizing to the same name must not cause a DuplicateColumnError.
+
+    The second occurrence should be renamed with a _2 suffix so both columns survive.
+    """
+    # Provide a sheet where two headers normalize to the same name
+    duplicate_headers = ["RCDTS", "Type", "School Name", "Survey Score", "Survey Score"]
+    sheet_data = {
+        "General": {
+            "headers": duplicate_headers,
+            "rows": [
+                {"RCDTS": "010010010260001", "Type": "School", "School Name": "Test School",
+                 "Survey Score": "80", duplicate_headers[4]: "90"},
+            ],
+        }
+    }
+
+    with patch('app.cli.import_data.get_settings') as mock_settings, \
+         patch('app.cli.import_data.parse_excel_file', return_value=sheet_data):
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        # Should not raise DuplicateColumnError
+        import_excel_file(test_excel_file, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    columns = [col['name'] for col in inspector.get_columns('schools_2024')]
+    engine.dispose()
+
+    assert 'survey_score' in columns
+    assert 'survey_score_2' in columns
