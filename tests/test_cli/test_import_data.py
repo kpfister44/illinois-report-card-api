@@ -290,6 +290,57 @@ def test_import_creates_state_table_for_statewide_row(excel_with_mixed_entity_ty
 
 
 # =============================================================================
+# Multi-Sheet Support
+# =============================================================================
+
+def test_import_processes_all_data_sheets(excel_with_multiple_sheets, temp_database):
+    """Test import creates tables for every recognized data sheet, not just General."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_multiple_sheets, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    engine.dispose()
+
+    assert 'schools_2024' in table_names
+    assert 'schools_finance_2024' in table_names
+
+
+def test_import_skips_non_data_sheets(excel_with_multiple_sheets, temp_database):
+    """Test import does not create tables for Revision History or similar non-data sheets."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_multiple_sheets, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    engine.dispose()
+
+    assert not any('revision' in t for t in table_names)
+    assert not any('history' in t for t in table_names)
+
+
+def test_import_uses_sheet_suffix_in_table_name(excel_with_multiple_sheets, temp_database):
+    """Test that non-General sheets use their sheet name as a suffix in the table name."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_multiple_sheets, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    engine.dispose()
+
+    # Finance sheet → schools_finance_2024 (not schools_2024 or finance_2024)
+    assert 'schools_finance_2024' in table_names
+    # General sheet still uses no suffix
+    assert 'schools_2024' in table_names
+
+
+# =============================================================================
 # Phase 4: import_excel_file() Exception Handling (Lines 163-169)
 # =============================================================================
 

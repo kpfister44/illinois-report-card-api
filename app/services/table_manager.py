@@ -22,7 +22,8 @@ def create_year_table(
     year: int,
     entity_type: str,
     schema: List[Dict[str, str]],
-    engine
+    engine,
+    sheet_suffix: str = "",
 ) -> Table:
     """
     Create a year-partitioned table for storing entity data.
@@ -32,11 +33,12 @@ def create_year_table(
         entity_type: Type of entity (e.g., "schools", "districts", "state")
         schema: List of column definitions with column_name and data_type
         engine: SQLAlchemy engine
+        sheet_suffix: Optional sheet identifier for non-General sheets (e.g., "finance", "iar")
 
     Returns:
         The created SQLAlchemy Table object
     """
-    table_name = f"{entity_type}_{year}"
+    table_name = f"{entity_type}_{year}" if not sheet_suffix else f"{entity_type}_{sheet_suffix}_{year}"
     metadata = MetaData()
 
     # Define columns

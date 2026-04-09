@@ -188,6 +188,34 @@ def test_excel_file(tmp_path):
 
 
 @pytest.fixture
+def excel_with_multiple_sheets(tmp_path):
+    """Create an Excel file with General, Finance, and Revision History sheets."""
+    file_path = tmp_path / "multi_sheet.xlsx"
+    wb = Workbook()
+
+    # General sheet (primary data)
+    ws_general = wb.active
+    ws_general.title = "General"
+    ws_general.append(["RCDTS", "School Name", "City", "County", "Type", "Enrollment"])
+    ws_general.append(["010010010260001", "Test Elementary", "Springfield", "Sangamon", "School", "425"])
+    ws_general.append(["010010010260002", "Test High School", "Springfield", "Sangamon", "School", "1250"])
+
+    # Finance sheet (supplementary data, same RCDTS key)
+    ws_finance = wb.create_sheet("Finance")
+    ws_finance.append(["RCDTS", "Type", "Operating Expenditure", "Per Pupil Cost"])
+    ws_finance.append(["010010010260001", "School", "1250000", "2941"])
+    ws_finance.append(["010010010260002", "School", "3500000", "2800"])
+
+    # Revision History sheet (should be skipped)
+    ws_notes = wb.create_sheet("Revision History")
+    ws_notes.append(["Date", "Change"])
+    ws_notes.append(["2024-01-01", "Initial release"])
+
+    wb.save(file_path)
+    return str(file_path)
+
+
+@pytest.fixture
 def excel_with_mixed_entity_types(tmp_path):
     """Create an Excel file with School, District, and Statewide rows."""
     file_path = tmp_path / "mixed_types.xlsx"

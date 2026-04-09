@@ -13,6 +13,39 @@ ENTITY_TYPE_MAP = {
     "Statewide": ("state", "state"),
 }
 
+# Sheets with no data content — skip entirely
+SKIP_SHEETS = {
+    "Revision History",
+    "Important Notes",
+    "Notes",
+    "Value Table for Growth Model",
+    "Growth Model Results",
+}
+
+# Maps sheet name → table suffix ("" = General, no suffix)
+SHEET_SUFFIX_MAP = {
+    "General": "",
+    "General (2)": "general2",
+    "Financial": "finance",
+    "Finance": "finance",
+    "ELA and Math": "elamathscience",
+    "ELA Math Science": "elamathscience",
+    "ELAMathScience": "elamathscience",
+    "PARCC": "parcc",
+    "SAT": "sat",
+    "IAR": "iar",
+    "IAR (2)": "iar2",
+    "ISA": "isa",
+    "DLM": "dlm",
+    "DLM-AA": "dlm",
+    "DLM-AA (2)": "dlm2",
+    "CTE": "cte",
+    "Discipline": "discipline",
+    "TeacherOF": "teacher",
+    "TeacherOutofField": "teacher",
+    "KIDS": "kids",
+}
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
@@ -61,116 +94,136 @@ def import_excel_file(file_path: str, year: int, dry_run: bool = False, detect_s
         print("Error: No data rows found in General sheet")
         sys.exit(1)
 
-    headers = general_sheet["headers"]
-    rows = general_sheet["rows"]
+    # Prepare all recognized sheets for import
+    prepared_sheets = []
+    total_rows = 0
+    for sheet_name, sheet_data in sheets.items():
+        if sheet_name in SKIP_SHEETS or sheet_name not in SHEET_SUFFIX_MAP:
+            continue
+        if not sheet_data["rows"]:
+            continue
+        sheet_suffix = SHEET_SUFFIX_MAP[sheet_name]
+        prepared_sheets.append((sheet_name, sheet_suffix, sheet_data))
+        total_rows += len(sheet_data["rows"])
 
-    print(f"Found {len(rows)} rows with {len(headers)} columns")
-
-    # Determine entity grouping based on presence of "Type" column
-    if "Type" in headers:
-        # 2018+ format: split rows by entity type
-        entity_groups: Dict[str, List[Dict]] = {}
-        for row_dict in rows:
-            type_val = row_dict.get("Type", "School")
-            if type_val in ENTITY_TYPE_MAP:
-                entity_groups.setdefault(type_val, []).append(row_dict)
-    else:
-        # 2010-2017 format: all rows are schools
-        entity_groups = {"School": rows}
+    print(f"Found {len(general_sheet['rows'])} rows in General sheet, {len(prepared_sheets)} sheets to import")
 
     if dry_run:
-        tables = [f"{ENTITY_TYPE_MAP[t][0]}_{year}" for t in entity_groups]
+        dry_tables = []
+        for sheet_name, suffix, sheet_data in prepared_sheets:
+            headers_tmp = sheet_data["headers"]
+            entity_vals = set()
+            if "Type" in headers_tmp:
+                for r in sheet_data["rows"]:
+                    tv = r.get("Type", "School")
+                    if tv in ENTITY_TYPE_MAP:
+                        entity_vals.add(tv)
+            else:
+                entity_vals = {"School"}
+            for tv in entity_vals:
+                tp = ENTITY_TYPE_MAP[tv][0]
+                tname = f"{tp}_{year}" if not suffix else f"{tp}_{suffix}_{year}"
+                dry_tables.append(tname)
         print("\nDry run - no database changes will be made")
-        print(f"Would create table: {', '.join(tables)}")
-        print(f"Would import {len(rows)} rows")
-        print(f"Columns: {', '.join(headers[:10])}...")
+        print(f"Would create table: {', '.join(dry_tables)}")
+        print(f"Would import {total_rows} rows")
         return
 
-    # Normalize column names and detect schema (shared across all entity types)
-    normalized_headers = [normalize_column_name(h) for h in headers]
+    # Pass 1: build schema and entity groups per sheet, then create all tables
+    # (all table creation must happen before the session opens to avoid lock contention)
+    sheet_plans = []  # (sheet_name, suffix, headers, normalized_headers, col_schema, entity_groups, is_general)
+    for sheet_name, sheet_suffix, sheet_data in prepared_sheets:
+        headers = sheet_data["headers"]
+        rows = sheet_data["rows"]
+        is_general = sheet_suffix == ""
 
-    col_schema: Dict[str, Dict] = {}
-    schema_list = []
-    for i, header in enumerate(headers):
-        normalized_header = normalized_headers[i]
-        sample_values = [row.get(header) for row in rows if row.get(header) is not None]
-        data_type = detect_column_type(header, sample_values) if detect_schema else "string"
-        category = detect_column_category(normalized_header) if detect_schema else "other"
+        if "Type" in headers:
+            entity_groups: Dict[str, List[Dict]] = {}
+            for row_dict in rows:
+                type_val = row_dict.get("Type", "School")
+                if type_val in ENTITY_TYPE_MAP:
+                    entity_groups.setdefault(type_val, []).append(row_dict)
+        else:
+            entity_groups = {"School": rows}
 
-        col_schema[normalized_header] = {
-            "data_type": data_type,
-            "category": category,
-            "source_column_name": header,
-        }
-        schema_list.append({"column_name": normalized_header, "data_type": data_type})
+        normalized_headers = [normalize_column_name(h) for h in headers]
+        col_schema: Dict[str, Dict] = {}
+        schema_list = []
+        for i, header in enumerate(headers):
+            norm = normalized_headers[i]
+            sample_values = [r.get(header) for r in rows if r.get(header) is not None]
+            data_type = detect_column_type(header, sample_values) if detect_schema else "string"
+            category = detect_column_category(norm) if detect_schema else "other"
+            col_schema[norm] = {"data_type": data_type, "category": category, "source_column_name": header}
+            schema_list.append({"column_name": norm, "data_type": data_type})
 
-    # Create all tables before opening a session (avoids SQLite lock contention)
-    for type_val in entity_groups:
-        table_prefix, _ = ENTITY_TYPE_MAP[type_val]
-        table_name = f"{table_prefix}_{year}"
-        print(f"Creating table: {table_name}")
-        create_year_table(year, table_prefix, schema_list, engine)
+        for type_val in entity_groups:
+            table_prefix, _ = ENTITY_TYPE_MAP[type_val]
+            table_name = f"{table_prefix}_{year}" if not sheet_suffix else f"{table_prefix}_{sheet_suffix}_{year}"
+            print(f"Creating table: {table_name}")
+            create_year_table(year, table_prefix, schema_list, engine, sheet_suffix=sheet_suffix)
 
+        sheet_plans.append((sheet_name, sheet_suffix, headers, normalized_headers, col_schema, entity_groups, is_general))
+
+    # Pass 2: insert data
     session = Session()
     try:
-        for type_val, group_rows in entity_groups.items():
-            table_prefix, master_entity_type = ENTITY_TYPE_MAP[type_val]
-            table_name = f"{table_prefix}_{year}"
+        for sheet_name, sheet_suffix, headers, normalized_headers, col_schema, entity_groups, is_general in sheet_plans:
+            for type_val, group_rows in entity_groups.items():
+                table_prefix, master_entity_type = ENTITY_TYPE_MAP[type_val]
+                table_name = f"{table_prefix}_{year}" if not sheet_suffix else f"{table_prefix}_{sheet_suffix}_{year}"
 
+                print(f"Inserting {len(group_rows)} rows into {table_name}...")
+                for row_dict in group_rows:
+                    row_data = {}
+                    for i, original_header in enumerate(headers):
+                        norm = normalized_headers[i]
+                        value = row_dict.get(original_header)
+                        data_type = col_schema[norm]["data_type"]
 
-            print(f"Inserting {len(group_rows)} rows into {table_name}...")
-            for row_dict in group_rows:
-                row_data = {}
-                for i, original_header in enumerate(headers):
-                    normalized_header = normalized_headers[i]
-                    value = row_dict.get(original_header)
-                    data_type = col_schema[normalized_header]["data_type"]
+                        if data_type == "percentage":
+                            row_data[norm] = clean_percentage(value)
+                        elif data_type == "integer":
+                            cleaned = clean_enrollment(value)
+                            row_data[norm] = cleaned if cleaned is not None else handle_suppressed(value)
+                        elif data_type == "float":
+                            cleaned = clean_percentage(value) if isinstance(value, str) and "%" in value else value
+                            row_data[norm] = cleaned if cleaned is not None else handle_suppressed(value)
+                        else:
+                            row_data[norm] = handle_suppressed(value)
 
-                    if data_type == "percentage":
-                        row_data[normalized_header] = clean_percentage(value)
-                    elif data_type == "integer":
-                        cleaned = clean_enrollment(value)
-                        row_data[normalized_header] = cleaned if cleaned is not None else handle_suppressed(value)
-                    elif data_type == "float":
-                        cleaned = clean_percentage(value) if isinstance(value, str) and "%" in value else value
-                        row_data[normalized_header] = cleaned if cleaned is not None else handle_suppressed(value)
-                    else:
-                        row_data[normalized_header] = handle_suppressed(value)
+                    columns = ", ".join(row_data.keys())
+                    placeholders = ", ".join([f":{k}" for k in row_data.keys()])
+                    sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+                    session.execute(text(sql), row_data)
 
-                columns = ", ".join(row_data.keys())
-                placeholders = ", ".join([f":{k}" for k in row_data.keys()])
-                sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
-                session.execute(text(sql), row_data)
+                    # Only populate entities_master from the General sheet
+                    if is_general and "rcdts" in row_data and row_data["rcdts"]:
+                        entity = session.query(EntitiesMaster).filter_by(rcdts=row_data["rcdts"]).first()
+                        if not entity:
+                            name = row_data.get("school_name") or row_data.get("district", "")
+                            entity = EntitiesMaster(
+                                rcdts=row_data["rcdts"],
+                                entity_type=master_entity_type,
+                                name=name,
+                                city=row_data.get("city", ""),
+                                county=row_data.get("county", ""),
+                            )
+                            session.add(entity)
 
-                if "rcdts" in row_data and row_data["rcdts"]:
-                    entity = session.query(EntitiesMaster).filter_by(rcdts=row_data["rcdts"]).first()
-                    if not entity:
-                        name = row_data.get("school_name") or row_data.get("district", "")
-                        entity = EntitiesMaster(
-                            rcdts=row_data["rcdts"],
-                            entity_type=master_entity_type,
-                            name=name,
-                            city=row_data.get("city", ""),
-                            county=row_data.get("county", ""),
-                        )
-                        session.add(entity)
-
-            if detect_schema:
-                print("Populating schema metadata...")
-                for column_name, column_info in col_schema.items():
-                    metadata_entry = SchemaMetadata(
-                        year=year,
-                        table_name=table_name,
-                        column_name=column_name,
-                        data_type=column_info["data_type"],
-                        category=column_info["category"],
-                        source_column_name=column_info["source_column_name"],
-                    )
-                    session.add(metadata_entry)
+                if detect_schema:
+                    for column_name, column_info in col_schema.items():
+                        session.add(SchemaMetadata(
+                            year=year,
+                            table_name=table_name,
+                            column_name=column_name,
+                            data_type=column_info["data_type"],
+                            category=column_info["category"],
+                            source_column_name=column_info["source_column_name"],
+                        ))
 
         session.commit()
-        total = sum(len(g) for g in entity_groups.values())
-        print(f"Import completed successfully! Imported {total} rows")
+        print(f"Import completed successfully! Imported {total_rows} rows")
 
     except Exception as e:
         session.rollback()
