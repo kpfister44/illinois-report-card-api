@@ -137,9 +137,31 @@ The `data/report-cards/` directory contains several files that are **not** impor
 
 Add endpoints or capabilities as needed based on real-world usage. Follow TDD.
 
-### 2. Deployment
+### 2. Deployment (immediate next priority)
 
-The app is Docker-ready. Deployment targets: Railway or Fly.io (both have docs in README.md). A persistent volume at `/app/data` is required for the SQLite database.
+The app is Docker-ready and all data is imported. The next session should plan and execute deployment. Key things to address:
+
+**Pre-deploy tasks:**
+- Write a `setup.sh` script that initializes the database and imports all 15 years in one command, so deployment is repeatable and not manual
+- Document the first-run flow: set `ADMIN_API_KEY` env var → run `setup.sh` → create a production API key via `POST /admin/keys`
+
+**Platform choice (decide before planning):**
+- **Railway** — easiest, good free tier, persistent volumes are straightforward
+- **Fly.io** — more control, slightly more setup, also solid for SQLite
+- Both are already documented in README.md
+
+**SQLite + persistent volume considerations:**
+- The database is ~362MB and read-only after import — SQLite is fine for this workload
+- The volume mount at `/app/data` must survive redeploys (verify this on chosen platform)
+- Backup strategy: copying the `.db` file is sufficient
+
+**Suggested deployment order:**
+1. Write `setup.sh` (init DB + import all years)
+2. Pick Railway or Fly.io
+3. Configure persistent volume at `/app/data`
+4. Set `ADMIN_API_KEY` env var and deploy
+5. Smoke test the live API (same endpoints as local smoke test)
+6. Create a production API key and document the live endpoint URL
 
 ---
 
