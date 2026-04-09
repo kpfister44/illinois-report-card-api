@@ -105,32 +105,36 @@ ReportCardAPI/
 
 ## Current Status
 
-- **Tests:** 118/118 passing (100%)
+- **Tests:** 124/124 passing (100%)
 - **All API endpoints:** Implemented and tested
 - **Database:** Empty — no real data has been imported yet
 - **Data files:** `data/report-cards/` contains Excel files for 2010–2024
+- **Import pipeline:** Fixed and ready — entity type splitting and multi-sheet support complete
 
 ---
 
 ## What's Next
 
-### 1. Data Ingestion (immediate priority)
+### 1. Data Ingestion (immediate priority — Phase 3 ready to execute)
 
-The real Excel files are already on disk. The import pipeline exists. The work is to run it and verify correctness with real data:
+The import pipeline is fixed and tested. Next step is importing real 2024 data. See the plan file at `~/.claude/plans/fancy-fluttering-shamir.md` for the full step-by-step.
 
 ```bash
-# Import a single year first as a smoke test
-.venv/bin/python -m app.cli.import_data data/report-cards/24-RC-Pub-Data-Set.xlsx --year 2024
+# Initialize the database (creates base tables + FTS5)
+.venv/bin/python -c "from app.database import init_db, engine; init_db(engine)"
 
-# List what's now in the database
-.venv/bin/python -m app.cli.import_data --list-years
+# Import 2024 (dry run first)
+.venv/bin/python -m app.cli.import_data data/report-cards/24-RC-Pub-Data-Set.xlsx --year 2024 --dry-run
+
+# Full import
+.venv/bin/python -m app.cli.import_data data/report-cards/24-RC-Pub-Data-Set.xlsx --year 2024
 ```
 
-Expected issues to watch for:
-- Excel files from different years have different column layouts and sheet names
-- Some years use layout files (e.g., `RC13_layout.xlsx`) — understand what these contain
-- The `--detect-schema` flag controls whether schema_metadata is populated
-- After import, run the full test suite to confirm nothing breaks
+**Import pipeline details:**
+- 2010–2017: single General sheet, all schools (no Type column)
+- 2018–2024: multi-sheet, General sheet has Type=School/District/Statewide
+- Tables: `schools_{year}`, `districts_{year}`, `state_{year}` (General sheet), plus `schools_finance_{year}`, `schools_iar_{year}`, etc. for other sheets
+- Constants controlling this: `ENTITY_TYPE_MAP`, `SKIP_SHEETS`, `SHEET_SUFFIX_MAP` in `app/cli/import_data.py`
 
 ### 2. New API Features
 
