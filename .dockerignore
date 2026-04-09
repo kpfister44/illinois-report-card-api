@@ -1,0 +1,36 @@
+# Excel source files — data is baked in via reportcard.db
+data/report-cards/
+
+# Python artifacts
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Testing
+tests/
+htmlcov/
+.coverage
+
+# Dev database backups
+*.db.bak
+
+# Git
+.git/
+.gitignore
+
+# Local config and scripts
+.env
+*.env
+init.sh
+
+# IDE
+.vscode/
+.idea/
+
+# Docs (not needed in image)
+PROJECT.md
+CLAUDE.md
