@@ -419,7 +419,7 @@ The app runs on any platform that supports Docker. Set the environment variables
 
 ## License
 
-[License TBD]
+MIT — see [LICENSE](LICENSE) for details.
 
 ## Data Source
 
