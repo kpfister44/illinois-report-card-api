@@ -11,6 +11,128 @@ A comprehensive REST API for accessing Illinois public school data from the Illi
 
 **To request an API key**, email [kpfister44@gmail.com](mailto:kpfister44@gmail.com) with a brief description of your intended use.
 
+## Quickstart for Researchers
+
+This section is for researchers who want to pull data without setting up any local infrastructure. All you need is an API key and a way to make HTTP requests — a terminal, Python, or R all work fine.
+
+### Step 1 — Get an API key
+
+Email [kpfister44@gmail.com](mailto:kpfister44@gmail.com) with a brief description of your project. You'll receive a key that looks like `rc_live_xxxxx`. Keep it handy — every request requires it.
+
+### Step 2 — Make your first request
+
+Paste this into a terminal (replace `rc_live_xxxxx` with your key):
+
+```bash
+curl -H "Authorization: Bearer rc_live_xxxxx" \
+  "https://reportcard-api-production.up.railway.app/years"
+```
+
+You should get back a list of available years (2010–2025). If you see that, you're good to go.
+
+### Step 3 — Discover what fields are available
+
+Each year has different fields. Use the `/schema/{year}` endpoint to see what's available:
+
+```bash
+curl -H "Authorization: Bearer rc_live_xxxxx" \
+  "https://reportcard-api-production.up.railway.app/schema/2024" \
+  | python3 -m json.tool | head -60
+```
+
+Each field entry tells you the column name, data type, category, and — importantly — which table it belongs to (`table_name`). Fields in the main district table will show `"table_name": "districts_2024"`; finance fields will show `"table_name": "districts_finance_2024"`, and so on.
+
+### Step 4 — Pull data
+
+#### District demographics (race, income, enrollment)
+
+Demographics live in the main district table. No special suffix needed:
+
+```bash
+curl -X POST "https://reportcard-api-production.up.railway.app/query" \
+  -H "Authorization: Bearer rc_live_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "year": 2024,
+    "entity_type": "district",
+    "fields": ["district_id", "district_name", "city", "county",
+               "total_enrollment", "white_pct", "black_pct",
+               "hispanic_pct", "low_income_pct"],
+    "limit": 100
+  }'
+```
+
+#### District finance data
+
+Finance data is in a supplementary table. Add `"table_suffix": "finance"`:
+
+```bash
+curl -X POST "https://reportcard-api-production.up.railway.app/query" \
+  -H "Authorization: Bearer rc_live_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "year": 2024,
+    "entity_type": "district",
+    "table_suffix": "finance",
+    "fields": ["district_id", "district_name", "total_revenue_per_pupil",
+               "local_revenue_per_pupil", "property_tax_per_pupil",
+               "total_expenditure_per_pupil"],
+    "limit": 100
+  }'
+```
+
+Merge the two datasets on `district_id` to get demographics and finance side by side.
+
+> **Finance data lags one year.** The 2024 report card contains 2022-23 actuals. If you need finance data for a specific fiscal year, pull from the report card year that is one year later (e.g., for FY2023 actuals, query year 2024).
+
+#### Paginating through all districts
+
+There are roughly 865 districts per year. Use `limit` and `offset` to page through them:
+
+```bash
+# Page 1 (first 500)
+-d '{"year": 2024, "entity_type": "district", "limit": 500, "offset": 0}'
+
+# Page 2 (next 500)
+-d '{"year": 2024, "entity_type": "district", "limit": 500, "offset": 500}'
+```
+
+#### Pulling data in Python
+
+```python
+import requests
+
+API_KEY = "rc_live_xxxxx"
+BASE_URL = "https://reportcard-api-production.up.railway.app"
+headers = {"Authorization": f"Bearer {API_KEY}"}
+
+def query(year, entity_type, fields=None, table_suffix=None, limit=500, offset=0):
+    payload = {
+        "year": year,
+        "entity_type": entity_type,
+        "fields": fields,
+        "table_suffix": table_suffix,
+        "limit": limit,
+        "offset": offset,
+    }
+    r = requests.post(f"{BASE_URL}/query", json=payload, headers=headers)
+    r.raise_for_status()
+    return r.json()
+
+# Get all district demographics for 2024
+result = query(2024, "district", fields=["district_id", "district_name",
+                                          "total_enrollment", "white_pct",
+                                          "black_pct", "hispanic_pct",
+                                          "low_income_pct"])
+districts = result["data"]
+```
+
+### What fields are actually called?
+
+Field names are normalized versions of the original ISBE Excel column headers (lowercased, spaces replaced with underscores). Because they vary by year, always check `/schema/{year}` first — or omit `fields` entirely to get all columns for a given table. See **[docs/query-guide.md](docs/query-guide.md)** for a full explanation of how tables and fields work across years.
+
+---
+
 ## Features
 
 - **16 Years of Data**: 2010–2025 Illinois Report Card data fully imported and queryable
