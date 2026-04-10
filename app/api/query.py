@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.dependencies import verify_api_key, get_db
 from app.models.database import APIKey
 from app.models.errors import AUTH_REQUIRED, INVALID_YEAR
-from app.services.table_manager import get_year_table
+from app.services.table_manager import table_exists
 
 router = APIRouter()
 
@@ -27,6 +27,7 @@ class QueryRequest(BaseModel):
 
     year: int
     entity_type: str
+    table_suffix: Optional[str] = None
     fields: Optional[List[str]] = None
     filters: Optional[Dict[str, Any]] = None
     sort: Optional[Dict[str, str]] = None
@@ -55,9 +56,13 @@ async def query(
     }
 
     table_base = entity_table_map.get(request.entity_type, request.entity_type + "s")
-    table = get_year_table(request.year, table_base, db.bind)
 
-    if table is None:
+    if request.table_suffix:
+        table_name = f"{table_base}_{request.table_suffix}_{request.year}"
+    else:
+        table_name = f"{table_base}_{request.year}"
+
+    if not table_exists(table_name, db.bind):
         raise HTTPException(
             status_code=400,
             detail={
@@ -71,8 +76,6 @@ async def query(
         select_clause = ", ".join(request.fields)
     else:
         select_clause = "*"
-
-    table_name = f"{table_base}_{request.year}"
 
     # Build WHERE clause for filters
     where_conditions = []

@@ -722,3 +722,103 @@ def test_post_query_prevents_sql_injection(client):
 
     finally:
         db.close()
+
+
+def test_post_query_with_table_suffix_queries_supplementary_table(client):
+    """Test that table_suffix routes the query to the correct supplementary table."""
+    from tests.conftest import TestingSessionLocal, engine
+    from sqlalchemy import text
+    from app.services.table_manager import create_year_table
+
+    db = TestingSessionLocal()
+    try:
+        test_key = "rcapi_test_query_suffix_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        # Create a supplementary ACT table (schools_act_2025)
+        act_schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "school_name", "data_type": "string"},
+            {"column_name": "act_composite", "data_type": "float"},
+        ]
+        create_year_table(2025, "schools", act_schema, engine, sheet_suffix="act")
+
+        db.execute(text("""
+            INSERT INTO schools_act_2025 (rcdts, school_name, act_composite)
+            VALUES
+                ('01-016-0001-17-0001', 'ACT Test School 1', 21.5),
+                ('01-016-0001-17-0002', 'ACT Test School 2', 23.0)
+        """))
+        db.commit()
+
+    finally:
+        db.close()
+
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "table_suffix": "act",
+            "fields": ["rcdts", "school_name", "act_composite"],
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    results = data["data"]
+    assert len(results) == 2
+    assert all("act_composite" in r for r in results)
+    composites = {r["act_composite"] for r in results}
+    assert composites == {21.5, 23.0}
+
+
+def test_post_query_with_missing_table_suffix_returns_400(client):
+    """Test that a table_suffix pointing to a non-existent table returns 400."""
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        test_key = "rcapi_test_query_badsuffix_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+    finally:
+        db.close()
+
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "school",
+            "table_suffix": "nonexistent",
+        }
+    )
+
+    assert response.status_code == 400
+    data = response.json()
+    assert data["code"] == "INVALID_PARAMETER"
