@@ -138,6 +138,126 @@ def test_get_schema_returns_field_metadata_for_year(client):
     assert enrollment_metadata["is_suppressed_indicator"] is False
 
 
+def test_get_schema_includes_table_name(client):
+    """Test #24: GET /schema/{year} includes table_name in each field's metadata."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        test_key = "rcapi_test_tablename_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "sat_composite", "data_type": "float"},
+        ]
+        create_year_table(2025, "schools", schema, engine)
+
+        metadata_entries = [
+            SchemaMetadata(
+                year=2025,
+                table_name="schools_2025",
+                column_name="rcdts",
+                data_type="string",
+                category="identifier",
+                source_column_name="RCDTS",
+                is_suppressed_indicator=False
+            ),
+            SchemaMetadata(
+                year=2025,
+                table_name="schools_sat_2025",
+                column_name="sat_composite",
+                data_type="float",
+                category="assessment",
+                source_column_name="SAT Composite",
+                is_suppressed_indicator=False
+            ),
+        ]
+        for entry in metadata_entries:
+            db.add(entry)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get(
+        "/schema/2025",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Every field must include table_name
+    for field in data["data"]:
+        assert "table_name" in field
+
+    # Values must match what was stored
+    rcdts = next(f for f in data["data"] if f["column_name"] == "rcdts")
+    assert rcdts["table_name"] == "schools_2025"
+
+    sat = next(f for f in data["data"] if f["column_name"] == "sat_composite")
+    assert sat["table_name"] == "schools_sat_2025"
+
+
+def test_get_schema_by_category_includes_table_name(client):
+    """Test #25: GET /schema/{year}/{category} includes table_name in each field's metadata."""
+    from tests.conftest import TestingSessionLocal, engine
+
+    db = TestingSessionLocal()
+    try:
+        test_key = "rcapi_test_cat_tablename_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        schema = [{"column_name": "sat_composite", "data_type": "float"}]
+        create_year_table(2025, "schools", schema, engine)
+
+        db.add(SchemaMetadata(
+            year=2025,
+            table_name="schools_sat_2025",
+            column_name="sat_composite",
+            data_type="float",
+            category="assessment",
+            source_column_name="SAT Composite",
+            is_suppressed_indicator=False
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get(
+        "/schema/2025/assessment",
+        headers={"Authorization": f"Bearer {test_key}"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["data"]) >= 1
+    for field in data["data"]:
+        assert "table_name" in field
+
+
 def test_get_schema_filters_by_category(client):
     """Test #23: GET /schema/{year}/{category} filters fields by category."""
     from tests.conftest import TestingSessionLocal, engine

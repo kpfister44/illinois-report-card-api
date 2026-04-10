@@ -6,7 +6,7 @@ This document is the primary orientation for any new Claude Code session. Read i
 
 ## What This Is
 
-A REST API that provides programmatic access to Illinois public school data from the Illinois State Board of Education (ISBE) Illinois Report Card. It handles 15 years of historical data (2010–2024), each year stored in its own table to accommodate schema changes across years. All endpoints are implemented, all tests pass, and the database is fully populated with real data.
+A REST API that provides programmatic access to Illinois public school data from the Illinois State Board of Education (ISBE) Illinois Report Card. It handles 16 years of historical data (2010–2025), each year stored in its own table to accommodate schema changes across years. All endpoints are implemented, all tests pass, and the database is fully populated with real data.
 
 ---
 

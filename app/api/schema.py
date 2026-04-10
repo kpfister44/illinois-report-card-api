@@ -45,6 +45,7 @@ async def get_schema_for_year(
     data = []
     for entry in metadata_entries:
         data.append({
+            "table_name": entry.table_name,
             "column_name": entry.column_name,
             "data_type": entry.data_type,
             "category": entry.category,
@@ -87,6 +88,7 @@ async def get_schema_for_year_and_category(
     data = []
     for entry in metadata_entries:
         data.append({
+            "table_name": entry.table_name,
             "column_name": entry.column_name,
             "data_type": entry.data_type,
             "category": entry.category,
