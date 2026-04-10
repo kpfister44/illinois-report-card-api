@@ -33,6 +33,7 @@ SHEET_SUFFIX_MAP = {
     "ELAMathScience": "elamathscience",
     "PARCC": "parcc",
     "SAT": "sat",
+    "ACT": "act",
     "IAR": "iar",
     "IAR (2)": "iar2",
     "ISA": "isa",

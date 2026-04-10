@@ -568,6 +568,77 @@ def test_main_exits_on_nonexistent_file(capsys):
 # Duplicate Column Handling
 # =============================================================================
 
+# =============================================================================
+# ACT Sheet Support
+# =============================================================================
+
+def test_import_creates_act_table_for_act_sheet(excel_with_act_sheet, temp_database):
+    """Test import creates schools_act_{year} table when ACT sheet is present."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_act_sheet, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    engine.dispose()
+
+    assert 'schools_act_2024' in table_names
+
+
+def test_import_act_table_has_normalized_score_columns(excel_with_act_sheet, temp_database):
+    """Test schools_act_{year} table has normalized ACT score column names."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_act_sheet, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    columns = [col['name'] for col in inspector.get_columns('schools_act_2024')]
+    engine.dispose()
+
+    assert 'rcdts' in columns
+    assert 'act_ela_average_score_grade_11' in columns
+    assert 'act_math_average_score_grade_11' in columns
+    assert 'act_science_average_score_grade_11' in columns
+
+
+def test_import_act_table_contains_score_data(excel_with_act_sheet, temp_database):
+    """Test schools_act_{year} table is populated with ACT scores, suppressed values as NULL."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_act_sheet, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT rcdts, act_ela_average_score_grade_11, act_science_average_score_grade_11 "
+                 "FROM schools_act_2024 ORDER BY rcdts")
+        ).fetchall()
+    engine.dispose()
+
+    assert len(rows) == 2
+    # First school has a numeric ELA score
+    assert rows[0][1] == pytest.approx(22.1, abs=0.01)
+    # Second school has suppressed science score → NULL
+    assert rows[1][2] is None
+
+
+def test_import_general_table_still_created_alongside_act(excel_with_act_sheet, temp_database):
+    """Test that General table (schools_2024) is still created even when ACT sheet is present."""
+    with patch('app.cli.import_data.get_settings') as mock_settings:
+        mock_settings.return_value.database_url = f"sqlite:///{temp_database}"
+        import_excel_file(excel_with_act_sheet, year=2024)
+
+    engine = create_engine(f"sqlite:///{temp_database}")
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    engine.dispose()
+
+    assert 'schools_2024' in table_names
+    assert 'schools_act_2024' in table_names
+
+
 def test_import_deduplicates_columns_with_same_normalized_name(test_excel_file, temp_database):
     """Two Excel columns normalizing to the same name must not cause a DuplicateColumnError.
 

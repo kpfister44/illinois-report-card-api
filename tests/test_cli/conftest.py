@@ -242,6 +242,34 @@ def excel_with_mixed_entity_types(tmp_path):
 
 
 @pytest.fixture
+def excel_with_act_sheet(tmp_path):
+    """Create an Excel file with General and ACT sheets using realistic ISBE column names."""
+    file_path = tmp_path / "with_act.xlsx"
+    wb = Workbook()
+
+    # General sheet (primary data)
+    ws_general = wb.active
+    ws_general.title = "General"
+    ws_general.append(["RCDTS", "School Name", "City", "County", "Type", "Enrollment"])
+    ws_general.append(["010010010260001", "Lincoln High School", "Springfield", "Sangamon", "School", "850"])
+    ws_general.append(["010010010260002", "Roosevelt High School", "Springfield", "Sangamon", "School", "1100"])
+
+    # ACT sheet — no Type column, only RCDTS and score columns
+    ws_act = wb.create_sheet("ACT")
+    ws_act.append([
+        "RCDTS",
+        "ACT ELA Average Score - Grade 11",
+        "ACT Math Average Score - Grade 11",
+        "ACT Science Average Score - Grade 11",
+    ])
+    ws_act.append(["010010010260001", 22.1, 21.5, 22.8])
+    ws_act.append(["010010010260002", 19.3, 18.7, "*"])  # suppressed science score
+
+    wb.save(file_path)
+    return str(file_path)
+
+
+@pytest.fixture
 def temp_database(tmp_path):
     """
     Create a temporary SQLite database file for testing.
