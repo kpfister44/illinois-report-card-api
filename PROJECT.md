@@ -149,6 +149,12 @@ The database is baked into the Docker image. To redeploy with code changes:
 
 The `ADMIN_API_KEY` bootstrap key is set in Railway environment variables — on startup `init_db()` ensures it exists in the database automatically.
 
+> **⚠️ Known issue: API keys are wiped on every redeploy.** Because the database is baked into the Docker image, any API keys created on the live production instance are lost whenever a new image is built and deployed. Only the bootstrap `ADMIN_API_KEY` survives (it's recreated from the Railway env var on startup). This means any researcher or user keys must be manually re-issued after each deploy. **This needs to be resolved** — the right fix is likely moving API key storage out of the baked-in SQLite database (e.g. a persistent volume, a separate Railway database, or environment-variable-based key provisioning).
+
+### 3. Active Researchers
+
+**Chris** — a researcher currently using the API. First contacted April 2026. Had trouble with the `/query` endpoint because the README examples contained incorrect field names. Key re-issued after each deploy — keep this in mind before redeploying. Use the admin key (`ADMIN_API_KEY` in Railway) to issue a new key via `POST /admin/keys` after each redeploy.
+
 ---
 
 ## How to Run
