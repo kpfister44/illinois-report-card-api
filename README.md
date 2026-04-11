@@ -55,9 +55,12 @@ curl -X POST "https://reportcard-api-production.up.railway.app/query" \
   -d '{
     "year": 2024,
     "entity_type": "district",
-    "fields": ["district_id", "district_name", "city", "county",
-               "total_enrollment", "white_pct", "black_pct",
-               "hispanic_pct", "low_income_pct"],
+    "fields": ["rcdts", "district", "city", "county",
+               "student_enrollment",
+               "pct_student_enrollment_white",
+               "pct_student_enrollment_black_or_african_american",
+               "pct_student_enrollment_hispanic_or_latino",
+               "pct_student_enrollment_low_income"],
     "limit": 100
   }'
 ```
@@ -74,14 +77,16 @@ curl -X POST "https://reportcard-api-production.up.railway.app/query" \
     "year": 2024,
     "entity_type": "district",
     "table_suffix": "finance",
-    "fields": ["district_id", "district_name", "total_revenue_per_pupil",
-               "local_revenue_per_pupil", "property_tax_per_pupil",
-               "total_expenditure_per_pupil"],
+    "fields": ["rcdts", "district",
+               "total_revenue_source",
+               "local_property_taxes",
+               "total_per_pupil_expenditures_subtotal",
+               "instructional_expenditure_per_pupil"],
     "limit": 100
   }'
 ```
 
-Merge the two datasets on `district_id` to get demographics and finance side by side.
+Merge the two datasets on `rcdts` to get demographics and finance side by side.
 
 > **Finance data lags one year.** The 2024 report card contains 2022-23 actuals. If you need finance data for a specific fiscal year, pull from the report card year that is one year later (e.g., for FY2023 actuals, query year 2024).
 
@@ -120,10 +125,12 @@ def query(year, entity_type, fields=None, table_suffix=None, limit=500, offset=0
     return r.json()
 
 # Get all district demographics for 2024
-result = query(2024, "district", fields=["district_id", "district_name",
-                                          "total_enrollment", "white_pct",
-                                          "black_pct", "hispanic_pct",
-                                          "low_income_pct"])
+result = query(2024, "district", fields=["rcdts", "district",
+                                          "student_enrollment",
+                                          "pct_student_enrollment_white",
+                                          "pct_student_enrollment_black_or_african_american",
+                                          "pct_student_enrollment_hispanic_or_latino",
+                                          "pct_student_enrollment_low_income"])
 districts = result["data"]
 ```
 
@@ -282,12 +289,12 @@ curl -X POST "https://reportcard-api-production.up.railway.app/query" \
   -d '{
     "year": 2024,
     "entity_type": "school",
-    "fields": ["rcdts", "name", "enrollment", "act_composite"],
+    "fields": ["rcdts", "school_name", "city", "student_enrollment"],
     "filters": {
       "city": "Chicago",
-      "enrollment": {"gte": 500}
+      "student_enrollment": {"gte": 500}
     },
-    "sort": {"field": "enrollment", "order": "desc"},
+    "sort": {"field": "student_enrollment", "order": "desc"},
     "limit": 100
   }'
 ```

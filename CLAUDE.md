@@ -9,6 +9,14 @@ Read `PROJECT.md` at the start of any session to understand the project architec
 
 Always use `.venv/bin/python` or `uv run` for Python commands — never bare `python`.
 
+## Git
+
+The remote is configured with SSH, but port 22 is blocked on this network. Always push via HTTPS:
+
+```bash
+git push https://github.com/kpfister44/illinois-report-card-api.git main
+```
+
 ## Foundational rules
 
 - Doing it right is better than doing it fast. You are not in a rush. NEVER skip steps or take shortcuts.
