@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from app.dependencies import verify_api_key, get_db
 from app.models.database import APIKey
@@ -133,7 +134,13 @@ async def query(
 
     # Get total count with filters
     count_query = text(f"SELECT COUNT(*) as total FROM {table_name} {where_clause}")
-    result = db.execute(count_query, query_params)
+    try:
+        result = db.execute(count_query, query_params)
+    except OperationalError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PARAMETER", "message": str(e.orig)}
+        )
     total = result.scalar()
 
     # Get paginated data with field selection and filters
@@ -144,7 +151,13 @@ async def query(
         {order_by_clause}
         LIMIT :limit OFFSET :offset
     """)
-    result = db.execute(data_query, query_params)
+    try:
+        result = db.execute(data_query, query_params)
+    except OperationalError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_PARAMETER", "message": str(e.orig)}
+        )
 
     # Convert rows to dictionaries
     rows = result.fetchall()

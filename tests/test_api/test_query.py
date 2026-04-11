@@ -786,6 +786,55 @@ def test_post_query_with_table_suffix_queries_supplementary_table(client):
     assert composites == {21.5, 23.0}
 
 
+def test_post_query_returns_400_for_invalid_field_names(client):
+    """Test that requesting nonexistent field names returns 400, not 500."""
+    from tests.conftest import TestingSessionLocal, engine
+    from sqlalchemy import text
+    from app.services.table_manager import create_year_table
+
+    db = TestingSessionLocal()
+    try:
+        test_key = "rcapi_test_query_badfields_key"
+        key_hash = hashlib.sha256(test_key.encode()).hexdigest()
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=test_key[:8],
+            owner_email="test@example.com",
+            owner_name="Test User",
+            is_active=True,
+            rate_limit_tier="free",
+            is_admin=False
+        )
+        db.add(api_key)
+        db.commit()
+
+        schema = [
+            {"column_name": "rcdts", "data_type": "string"},
+            {"column_name": "district", "data_type": "string"},
+        ]
+        create_year_table(2025, "districts", schema, engine)
+        db.execute(text("INSERT INTO districts_2025 (rcdts, district) VALUES ('01-001-0010-00-000', 'Test District')"))
+        db.commit()
+    finally:
+        db.close()
+
+    # Request a field that doesn't exist in this table (2024-era name vs 2025 schema)
+    response = client.post(
+        "/query",
+        headers={"Authorization": f"Bearer {test_key}"},
+        json={
+            "year": 2025,
+            "entity_type": "district",
+            "fields": ["rcdts", "district_name"],  # district_name doesn't exist; column is 'district'
+        }
+    )
+
+    assert response.status_code == 400, f"Expected 400, got {response.status_code}"
+    data = response.json()
+    assert data["code"] == "INVALID_PARAMETER"
+    assert "district_name" in data["message"]
+
+
 def test_post_query_with_missing_table_suffix_returns_400(client):
     """Test that a table_suffix pointing to a non-existent table returns 400."""
     from tests.conftest import TestingSessionLocal
