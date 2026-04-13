@@ -61,14 +61,14 @@ curl -X POST "https://reportcard-api-production.up.railway.app/query" \
     "year": 2024,
     "entity_type": "school",
     "table_suffix": "sat",
-    "fields": ["rcdts", "school_name", "sat_composite_all"],
+    "fields": ["rcdts", "school_name", "sat_reading_average_score", "sat_math_average_score"],
     "filters": {"city": "Chicago"},
-    "sort": {"field": "sat_composite_all", "order": "DESC"},
+    "sort": {"field": "sat_reading_average_score", "order": "DESC"},
     "limit": 20
   }'
 ```
 
-### Example: IAR proficiency for a specific district in 2023
+### Example: IAR proficiency for districts in 2023
 
 ```bash
 curl -X POST "https://reportcard-api-production.up.railway.app/query" \
@@ -78,7 +78,7 @@ curl -X POST "https://reportcard-api-production.up.railway.app/query" \
     "year": 2023,
     "entity_type": "district",
     "table_suffix": "iar",
-    "fields": ["district_id", "district_name", "ela_proficiency_all", "math_proficiency_all"],
+    "fields": ["rcdts", "district", "pct_all_students_iar_ela_level_4_grade_3", "pct_all_students_iar_mathematics_level_4_grade_3"],
     "limit": 50
   }'
 ```
@@ -93,8 +93,8 @@ curl -X POST "https://reportcard-api-production.up.railway.app/query" \
     "year": 2025,
     "entity_type": "school",
     "table_suffix": "act",
-    "fields": ["rcdts", "school_name", "act_composite"],
-    "sort": {"field": "act_composite", "order": "DESC"},
+    "fields": ["rcdts", "school_name", "act_ela_average_score_grade_11", "act_math_average_score_grade_11"],
+    "sort": {"field": "act_ela_average_score_grade_11", "order": "DESC"},
     "limit": 25
   }'
 ```
@@ -103,9 +103,9 @@ curl -X POST "https://reportcard-api-production.up.railway.app/query" \
 
 ## Known behaviors and workarounds
 
-### Requesting a missing field returns 500, not null
+### Requesting a missing field returns 400, not null
 
-If a field in your `fields` array does not exist in the target table, the API returns a `500 Internal Server Error`. This happens because field names are injected directly into the SQL `SELECT` clause — a missing column is a SQLite error.
+If a field in your `fields` array does not exist in the target table, the API returns a `400 INVALID_PARAMETER` error. This happens because field names are injected directly into the SQL `SELECT` clause — a missing column is a SQLite error.
 
 **This is most likely to happen when:**
 - A field exists in one year's table but not another (schemas change year-over-year)
