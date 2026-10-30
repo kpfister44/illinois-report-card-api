@@ -24,6 +24,7 @@ htmlcov/
 
 # Local config and scripts
 .env
+data/test_key.txt
 *.env
 init.sh
 
