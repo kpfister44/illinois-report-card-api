@@ -153,7 +153,13 @@ The `ADMIN_API_KEY` bootstrap key is set in Railway environment variables — on
 
 ### 3. Active Researchers
 
-**Chris** — a researcher currently using the API. First contacted April 2026. Had trouble with the `/query` endpoint because the README examples contained incorrect field names. Key re-issued after each deploy — keep this in mind before redeploying. Use the admin key (`ADMIN_API_KEY` in Railway) to issue a new key via `POST /admin/keys` after each redeploy.
+**Chris** — a researcher doing district-level demographic and finance research. First contacted April 2026. Had trouble with the `/query` endpoint because the README examples contained incorrect field names (fixed 2026-04-11). Has since gotten `/query` working for districts and finance tables. Asked about a column name crosswalk across years — no such feature exists yet; directed him to use `GET /schema/{year}` and ask about specific variables.
+
+Key findings from investigating column stability (2026-04-13):
+- Schools primary table (2010–2025): only 7 columns are stable across all 16 years — all identity fields (`rcdts`, `school_name`, `district`, `city`, `county`, `grades_served`, `school_type`). No data columns are universally stable.
+- Districts primary table (2018–2025): zero columns stable across all 8 years. Best coverage is 7/8 years (2018–2024) for ~113 columns including chronic absenteeism breakdowns, `admin_avg_salary`, `avg_teaching_exp`, class size, and five essentials survey fields. 2025 introduced a major schema restructure that dropped most of these.
+
+Key re-issued after each deploy — keep this in mind before redeploying. Use the admin key (`ADMIN_API_KEY` in Railway) to issue a new key via `POST /admin/keys` after each redeploy.
 
 ---
 
