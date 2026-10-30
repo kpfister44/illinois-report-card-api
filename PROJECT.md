@@ -106,7 +106,7 @@ ReportCardAPI/
 
 ## Current Status
 
-- **Tests:** 147/147 passing (100%) — unit/integration tests (real-data tests excluded from CI count)
+- **Tests:** 150/150 passing (100%) — unit/integration tests (real-data tests excluded from CI count)
 - **All API endpoints:** Implemented and tested
 - **Database:** Fully populated — all 17 years (2010–2026) imported
 - **Data files:** `data/report-cards/` contains Excel files for 2010–2026
@@ -142,10 +142,15 @@ Add endpoints or capabilities as needed based on real-world usage. Follow TDD.
 
 ### 2. Redeploying
 
-The database is baked into the Docker image. To redeploy with code changes:
+The database is baked into the Docker image, and every redeploy wipes researcher API keys (see below). Requires Docker Desktop (logged in to Docker Hub as `kpfister44`) and the Railway CLI (logged in; the home directory is linked to the `reportcard-api` project). Run each step separately and check it before moving on:
 
-1. Build and push: `docker buildx build --platform linux/amd64 -t kpfister44/reportcard-api:latest --push .`
-2. Redeploy: `railway redeploy --service reportcard-api --yes`
+1. **Build locally:** `docker buildx build --platform linux/amd64 -t kpfister44/reportcard-api:latest --load .`
+2. **Check what got baked in:** `docker run --rm --platform linux/amd64 --entrypoint ls kpfister44/reportcard-api:latest -la data/` should list only `reportcard.db` (plus `.DS_Store`). `.dockerignore` patterns only match at the build-context root unless prefixed with `**/`.
+3. **Smoke-test:** run the image with `--rm -p 8200:8000 -e ADMIN_API_KEY=<throwaway>`, then check `GET /years` with that key. The throwaway key lives only in the container, never in `data/reportcard.db`.
+4. **Push:** `docker push kpfister44/reportcard-api:latest`. The ~490MB database layer timed out repeatedly until Docker Desktop's engine config had `"max-concurrent-uploads": 1` (Settings → Docker Engine); that setting is now in place.
+5. **Confirm the push:** `docker buildx imagetools inspect kpfister44/reportcard-api:latest` must show the same digest as the local image. **Do not redeploy until it does** — a redeploy after a failed push restarts the old image and still wipes every key.
+6. **Redeploy:** `railway redeploy --service reportcard-api --yes`, then confirm the new deployment runs the new image digest and `/health` returns ok.
+7. **Tell Kyle** so he can re-issue researcher keys.
 
 The `ADMIN_API_KEY` bootstrap key is set in Railway environment variables — on startup `init_db()` ensures it exists in the database automatically.
 
@@ -159,7 +164,7 @@ Key findings from investigating column stability (2026-04-13):
 - Schools primary table (2010–2025): only 7 columns are stable across all 16 years — all identity fields (`rcdts`, `school_name`, `district`, `city`, `county`, `grades_served`, `school_type`). No data columns are universally stable.
 - Districts primary table (2018–2025): zero columns stable across all 8 years. Best coverage is 7/8 years (2018–2024) for ~113 columns including chronic absenteeism breakdowns, `admin_avg_salary`, `avg_teaching_exp`, class size, and five essentials survey fields. 2025 introduced a major schema restructure that dropped most of these.
 
-Key re-issued after each deploy — keep this in mind before redeploying. Use the admin key (`ADMIN_API_KEY` in Railway) to issue a new key via `POST /admin/keys` after each redeploy.
+Chris's key was last wiped by the 2026-10-30 redeploy that shipped the 2026 data; Kyle re-issues it. Key re-issued after each deploy — keep this in mind before redeploying. Use the admin key (`ADMIN_API_KEY` in Railway) to issue a new key via `POST /admin/keys` after each redeploy.
 
 ---
 
