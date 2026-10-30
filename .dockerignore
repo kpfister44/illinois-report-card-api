@@ -16,7 +16,7 @@ htmlcov/
 .coverage
 
 # Dev database backups
-*.db.bak
+**/*.db.bak
 
 # Git
 .git/
