@@ -6,7 +6,7 @@ This document is the primary orientation for any new Claude Code session. Read i
 
 ## What This Is
 
-A REST API that provides programmatic access to Illinois public school data from the Illinois State Board of Education (ISBE) Illinois Report Card. It handles 16 years of historical data (2010–2025), each year stored in its own table to accommodate schema changes across years. All endpoints are implemented, all tests pass, and the database is fully populated with real data.
+A REST API that provides programmatic access to Illinois public school data from the Illinois State Board of Education (ISBE) Illinois Report Card. It handles 17 years of historical data (2010–2026), each year stored in its own table to accommodate schema changes across years. All endpoints are implemented, all tests pass, and the database is fully populated with real data.
 
 ---
 
@@ -108,8 +108,8 @@ ReportCardAPI/
 
 - **Tests:** 147/147 passing (100%) — unit/integration tests (real-data tests excluded from CI count)
 - **All API endpoints:** Implemented and tested
-- **Database:** Fully populated — all 16 years (2010–2025) imported
-- **Data files:** `data/report-cards/` contains Excel files for 2010–2024; 2025 file lives in the ISE project directory
+- **Database:** Fully populated — all 17 years (2010–2026) imported
+- **Data files:** `data/report-cards/` contains Excel files for 2010–2026
 - **Import pipeline:** Fully operational — entity type splitting, multi-sheet support, digit-leading column prefix, duplicate column deduplication, ACT sheet support all in place
 - **POST /query:** Supports optional `table_suffix` parameter to query supplementary tables (e.g., `schools_act_2025`, `schools_iar_2025`)
 - **Deployed:** Live on Railway at `https://reportcard-api-production.up.railway.app`
@@ -122,7 +122,7 @@ ReportCardAPI/
 |-------|--------|----------------|
 | 2010–2017 | Single General sheet, all rows are schools | `schools_{year}` only |
 | 2018–2024 | Multi-sheet, Type column splits rows | `schools_{year}`, `districts_{year}`, `state_{year}` + supplementary sheets (finance, IAR, SAT, etc.) |
-| 2025 | Multi-sheet, includes separate ACT sheet | `schools_2025`, `schools_act_2025`, `schools_iar_2025`, + 8 other supplementary tables |
+| 2025–2026 | Multi-sheet, includes separate ACT sheet | `schools_{year}`, `schools_act_{year}`, `schools_iar_{year}`, + 8 other supplementary tables |
 
 ### Supplementary files not imported
 

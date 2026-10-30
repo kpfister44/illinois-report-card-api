@@ -12,7 +12,7 @@ Data is stored in year-partitioned tables. Every year has a set of **main tables
 
 | Entity type | Table pattern | Years available |
 |-------------|---------------|-----------------|
-| School | `schools_{year}` | 2010–2025 |
+| School | `schools_{year}` | 2010–2026 |
 | District | `districts_{year}` | 2018–2024 |
 | State | `state_{year}` | 2018–2024 |
 
@@ -22,7 +22,7 @@ Supplementary tables follow the pattern `{entity_type}_{suffix}_{year}`. The `en
 
 | Suffix | Content | Entity types | Years available |
 |--------|---------|--------------|-----------------|
-| `act` | ACT college-readiness scores | schools | 2025 |
+| `act` | ACT college-readiness scores | schools | 2025–2026 |
 | `cte` | Career and technical education | schools, districts, state | 2022–2025 (schools); 2022–2024 (districts, state) |
 | `discipline` | Student discipline data | schools, districts, state | 2023–2025 (schools); 2023–2024 (districts, state) |
 | `dlm` | Dynamic Learning Maps alternate assessment | schools, districts, state | 2018–2024 (gaps: no 2020) |

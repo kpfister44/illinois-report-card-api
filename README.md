@@ -28,7 +28,7 @@ curl -H "Authorization: Bearer rc_live_xxxxx" \
   "https://reportcard-api-production.up.railway.app/years"
 ```
 
-You should get back a list of available years (2010–2025). If you see that, you're good to go.
+You should get back a list of available years (2010–2026). If you see that, you're good to go.
 
 ### Step 3 — Discover what fields are available
 
@@ -142,7 +142,7 @@ Field names are normalized versions of the original ISBE Excel column headers (l
 
 ## Features
 
-- **16 Years of Data**: 2010–2025 Illinois Report Card data fully imported and queryable
+- **17 Years of Data**: 2010–2026 Illinois Report Card data fully imported and queryable
 - **Year-Partitioned Architecture**: Handles format changes across years — each year has its own table
 - **Full-Text Search**: FTS5-powered search across schools, districts, and state entities
 - **Flexible Query API**: Advanced filtering, sorting, and field selection via POST /query
@@ -301,13 +301,13 @@ curl -X POST "https://reportcard-api-production.up.railway.app/query" \
 
 ## Data Coverage
 
-All 16 years (2010–2025) are imported. The schema varies by era:
+All 17 years (2010–2026) are imported. The schema varies by era:
 
 | Years | Tables per year |
 |-------|----------------|
 | 2010–2017 | `schools_{year}` — demographics + ACT scores |
 | 2018–2024 | `schools_{year}`, `districts_{year}`, `state_{year}` + supplementary tables (finance, IAR, SAT, CTE, etc.) |
-| 2025 | `schools_2025` + supplementary tables including a separate `schools_act_2025` sheet |
+| 2025–2026 | `schools_{year}` + supplementary tables including a separate `schools_act_{year}` sheet |
 
 For a full reference of supplementary table suffixes (sat, iar, act, finance, etc.) and how to query them, see **[docs/query-guide.md](docs/query-guide.md)**.
 
@@ -356,7 +356,7 @@ uv run pytest tests/test_api/test_schools.py
 |-------|----|---------------|
 | `tests/test_api/`, `tests/test_services/`, `tests/test_utils/` | In-memory SQLite | API logic, endpoint behaviour, utility functions |
 | `tests/test_integration/` | Temp file-based SQLite | Full import pipeline end-to-end |
-| `tests/test_real_data/` | Real `data/reportcard.db` | Row counts, data shape, year boundary conditions across all 16 years |
+| `tests/test_real_data/` | Real `data/reportcard.db` | Row counts, data shape, year boundary conditions across all 17 years |
 
 The real-data tests skip automatically if `data/reportcard.db` is absent or empty, so CI without the database still passes cleanly.
 

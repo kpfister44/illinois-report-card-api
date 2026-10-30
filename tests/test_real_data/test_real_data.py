@@ -8,14 +8,14 @@ import re
 # Year coverage
 # ---------------------------------------------------------------------------
 
-def test_years_returns_all_16_years(real_client, auth_header):
-    """GET /years must include every year from 2010 through 2025 (exactly 16)."""
+def test_years_returns_all_17_years(real_client, auth_header):
+    """GET /years must include every year from 2010 through 2026 (exactly 17)."""
     response = real_client.get("/years", headers=auth_header)
     assert response.status_code == 200
     data = response.json()
     years = data["data"]
-    assert data["meta"]["count"] == 16
-    assert set(years) == set(range(2010, 2026))
+    assert data["meta"]["count"] == 17
+    assert set(years) == set(range(2010, 2027))
 
 
 # ---------------------------------------------------------------------------
